@@ -1,0 +1,10 @@
+.DS_store
+*.log
+
+java/.idea
+java/java.iml
+java/*.class
+
+rust/.idea
+rust/target
+rust/Cargo.lock
