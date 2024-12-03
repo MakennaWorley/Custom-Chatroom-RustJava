@@ -1,9 +1,8 @@
-use std::net::UdpSocket;
-use std::io::{self, Write};
+use std::net::TcpStream;
+use std::io::{self, Write, Read};
 
 fn main() -> io::Result<()> {
-    let socket = UdpSocket::bind("0.0.0.0:0")?;
-    socket.connect("127.0.0.1:8000")?;
+    let mut stream = TcpStream::connect("127.0.0.1:8000")?;
     println!("Requesting access to chat room. Please select a username that has between 3 and 30 characters and only alphanumeric symbols.");
 
     let mut input = String::new();
@@ -17,10 +16,10 @@ fn main() -> io::Result<()> {
         let username = input.trim();
 
         if !username.is_empty() {
-            socket.send(username.as_bytes())?;
+            stream.write_all(username.as_bytes())?;
 
             let mut buffer = [0; 1024];
-            let size = socket.recv(&mut buffer)?;
+            let size = stream.read(&mut buffer)?;
             let response = String::from_utf8_lossy(&buffer[..size]);
             let response_trimmed = response.trim();
 
