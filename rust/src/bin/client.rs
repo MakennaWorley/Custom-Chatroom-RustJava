@@ -9,14 +9,14 @@ fn main() -> io::Result<()> {
     let mut stdout = io::stdout();
 
     loop {
-        print!("Enter username: ");
+        print!("Enter a command: ");
         stdout.flush()?;
         input.clear();
         io::stdin().read_line(&mut input)?;
-        let username = input.trim();
+        let message = input.trim();
 
-        if !username.is_empty() {
-            stream.write_all(username.as_bytes())?;
+        if !message.is_empty() {
+            stream.write_all(message.as_bytes())?;
 
             let mut buffer = [0; 1024];
             let size = stream.read(&mut buffer)?;
@@ -25,8 +25,7 @@ fn main() -> io::Result<()> {
 
             match response_trimmed {
                 "200 OK" => {
-                    println!("Username accepted. You have joined the chatroom!");
-                    break;
+                    println!("Command was accepted, you should see something posted on the server side or get a message from the server");
                 }
                 "400 INVALID USERNAME" => {
                     println!("Invalid username. Please try again.");

@@ -1,3 +1,4 @@
+use serde_json::Value;
 use std::collections::HashMap;
 use std::io::{Read, Write};
 use std::net::{TcpListener, TcpStream};
@@ -33,28 +34,63 @@ fn main() -> std::io::Result<()> {
 
 fn handle_client(mut stream: TcpStream, state: SharedState) -> std::io::Result<()> {
     let mut buffer = [0; 1024];
-    let size = stream.read(&mut buffer)?;
 
-    if size == 0 {
-        return Ok(());
-    }
+    loop {
+        let size = stream.read(&mut buffer)?;
 
-    let message = String::from_utf8_lossy(&buffer[..size]).trim().to_string();
-    let mut response = "500 CONNECTION ERROR\n".to_string();
-
-    if is_valid_username(&message, &state) {
-        {
-            let mut state = state.lock().unwrap();
-            state.insert(stream.peer_addr()?.to_string(), message.clone());
+        if size == 0 {
+            println!("Client disconnected");
+            return Ok(());
         }
-        println!("{} has joined from {}", message, stream.peer_addr()?);
-        response = "200 OK\n".to_string();
-    } else {
-        response = "400 INVALID USERNAME\n".to_string();
-    }
 
-    stream.write_all(response.as_bytes())?;
-    Ok(())
+        let raw_message = String::from_utf8_lossy(&buffer[..size]).trim().to_string();
+        let (command, message) = raw_message.split_once(' ').unwrap_or((raw_message.as_str(), ""));
+
+        println!("Command: {}, Message: {}", command, message);
+
+        let mut response = "500 SERVER ERROR\n".to_string();
+
+        match command {
+            "JOIN" => {
+                if is_valid_username(&message, &state) {
+                    {
+                        let mut state = state.lock().unwrap();
+                        state.insert(stream.peer_addr()?.to_string(), message.to_string());
+                    }
+                    println!("{} has joined from {}", message, stream.peer_addr()?);
+                    response = "200 OK\n".to_string();
+                } else {
+                    response = "400 INVALID USERNAME\n".to_string();
+                }
+            }
+            "LEAVE" => {
+                if let Some(parsed_message) = parse_message(message) {
+                    println!("Processing LEAVE with message: {:?}", parsed_message);
+                    response = format!("200 OK\n");
+                }
+            }
+            "SEND" => {
+                if let Some(parsed_message) = parse_message(message) {
+                    println!("Processing SEND with message: {:?}", parsed_message);
+                    response = format!("200 OK\n");
+                }
+            }
+            _ => {
+                response = "500 SERVER ERROR\n".to_string();
+            }
+        }
+
+        stream.write_all(response.as_bytes())?;
+    }
+}
+
+fn parse_message(message: &str) -> Option<Value> {
+    if let Ok(json_value) = serde_json::from_str::<Value>(message) {
+        Some(json_value)
+    } else {
+        // Treat as plain text wrapped as a JSON string
+        Some(Value::String(message.to_string()))
+    }
 }
 
 fn is_valid_username(username: &str, state: &SharedState) -> bool {
