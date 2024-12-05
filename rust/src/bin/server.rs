@@ -8,8 +8,8 @@ use std::thread;
 type SharedState = Arc<Mutex<HashMap<String, String>>>;
 
 fn main() -> std::io::Result<()> {
-    let listener = TcpListener::bind("127.0.0.1:8000")?;
-    println!("Server started on 127.0.0.1:8000");
+    let listener = TcpListener::bind("146.86.114.51:8000")?;
+    println!("Server started on 146.86.114.51:8000");
 
     let state: SharedState = Arc::new(Mutex::new(HashMap::new()));
 
@@ -34,16 +34,29 @@ fn main() -> std::io::Result<()> {
 
 fn handle_client(mut stream: TcpStream, state: SharedState) -> std::io::Result<()> {
     let mut buffer = [0; 1024];
+    let peer_addr = stream.peer_addr()?.to_string();
 
     loop {
-        let size = stream.read(&mut buffer)?;
+        let size = match stream.read(&mut buffer) {
+            Ok(size) if size == 0 => {
+                // Handle disconnection
+                cleanup_user(&peer_addr, &state);
+                println!("Client {} disconnected", peer_addr);
+                return Ok(());
+            }
+            Ok(size) => size,
+            Err(e) => {
+                // Handle read error
+                cleanup_user(&peer_addr, &state);
+                eprintln!("Error reading from client {}: {}", peer_addr, e);
+                return Err(e);
+            }
+        };
 
-        if size == 0 {
-            println!("Client disconnected");
-            return Ok(());
-        }
-
-        let raw_message = String::from_utf8_lossy(&buffer[..size]).trim().to_string();
+        let raw_message = String::from_utf8_lossy(&buffer[..size])
+                                    .trim()
+                                    .trim_end_matches('\n')
+                                    .to_string();
         let (command, message) = raw_message.split_once(' ').unwrap_or((raw_message.as_str(), ""));
 
         println!("Command: {}, Message: {}", command, message);
@@ -55,24 +68,25 @@ fn handle_client(mut stream: TcpStream, state: SharedState) -> std::io::Result<(
                 if is_valid_username(&message, &state) {
                     {
                         let mut state = state.lock().unwrap();
-                        state.insert(stream.peer_addr()?.to_string(), message.to_string());
+                        state.insert(peer_addr.clone(), message.to_string());
                     }
-                    println!("{} has joined from {}", message, stream.peer_addr()?);
+                    println!("{} has joined from {}", message, peer_addr);
                     response = "200 OK\n".to_string();
                 } else {
                     response = "400 INVALID USERNAME\n".to_string();
                 }
             }
             "LEAVE" => {
-                if let Some(parsed_message) = parse_message(message) {
-                    println!("Processing LEAVE with message: {:?}", parsed_message);
-                    response = format!("200 OK\n");
+                let mut state = state.lock().unwrap();
+                if let Some(username) = state.remove(&peer_addr) {
+                    println!("{} has left from {}", username, peer_addr);
+                    response = "200 BYE\n".to_string();
                 }
             }
             "SEND" => {
                 if let Some(parsed_message) = parse_message(message) {
                     println!("Processing SEND with message: {:?}", parsed_message);
-                    response = format!("200 OK\n");
+                    response = format!("200 SEND\n");
                 }
             }
             _ => {
@@ -112,4 +126,11 @@ fn is_valid_username(username: &str, state: &SharedState) -> bool {
     }
 
     true
+}
+
+fn cleanup_user(peer_addr: &str, state: &SharedState) {
+    let mut state = state.lock().unwrap();
+    if let Some(username) = state.remove(peer_addr) {
+        println!("Cleaned up user {} from {}", username, peer_addr);
+    }
 }
