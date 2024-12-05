@@ -2,6 +2,7 @@ use std::net::TcpStream;
 use local_ip_address::local_ip;
 use std::io::{self, Write, Read};
 use serde_json::Value;
+use chrono::Utc;
 
 fn main() -> io::Result<()> {
     let local_ip = local_ip().expect("Could not get local IP");
@@ -21,7 +22,13 @@ fn main() -> io::Result<()> {
         let message = input.trim();
 
         if !message.is_empty() {
-            stream.write_all(format!("{}\n", message).as_bytes())?;
+            if message.starts_with("SEND") {
+                if let Some(json_message) = process_send_message(&message["SEND".len()..].trim()) {
+                    stream.write_all(format!("SEND {}\n", json_message).as_bytes())?;
+                }
+            } else {
+                stream.write_all(format!("{}\n", message).as_bytes())?;
+            }
 
             let mut buffer = [0; 1024];
             let size = stream.read(&mut buffer)?;
@@ -40,6 +47,23 @@ fn main() -> io::Result<()> {
                 } else {
                     println!("Unexpected format for userboard response.");
                 }
+            } else if response_trimmed.starts_with("200 SEND") {
+                let json_part = response_trimmed.trim_start_matches("200 SEND").trim();
+                match serde_json::from_str::<Value>(json_part) {
+                    Ok(json_response) => {
+                        if let Some(sender) = json_response["sender"].as_str() {
+                            if let Some(message) = json_response["message"].as_str() {
+                                println!("Message from {}: {}", sender, message);
+                            }
+                        } else {
+                            println!("Unexpected JSON format: {}", json_response);
+                        }
+                    }
+                    Err(e) => {
+                        println!("Failed to parse JSON: {}", json_part);
+                        println!("Error: {}", e);
+                    }
+                }
             } else {
                 match response_trimmed {
                     "200 OK" => {
@@ -52,8 +76,8 @@ fn main() -> io::Result<()> {
                         println!("Leaving the chatroom");
                         return Ok(());
                     }
-                    "200 SEND" => {
-                        println!("Accepted send command");
+                    "200 SENT" => {
+                        println!("Message in queue to be sent");
                     }
                     "200 USERSTATUS UPDATED" => {
                         println!("Accepted user status change command");
@@ -69,4 +93,21 @@ fn main() -> io::Result<()> {
         }
     }
 
+}
+
+fn process_send_message(input: &str) -> Option<String> {
+    match serde_json::from_str::<Value>(input) {
+        Ok(mut json_obj) => {
+            if let Some(obj) = json_obj.as_object_mut() {
+                obj.insert("timestamp".to_string(), Value::String(Utc::now().to_rfc3339()));
+                return Some(json_obj.to_string());
+            } else {
+                println!("Invalid SEND command: JSON must be an object.");
+            }
+        }
+        Err(e) => {
+            println!("Failed to parse JSON: {}", e);
+        }
+    }
+    None
 }
