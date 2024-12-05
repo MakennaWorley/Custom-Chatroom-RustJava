@@ -2,14 +2,18 @@
 use std::collections::HashMap;
 use std::io::{Read, Write};
 use std::net::{TcpListener, TcpStream};
+use local_ip_address::local_ip;
 use std::sync::{Arc, Mutex};
 use std::thread;
 
 type SharedState = Arc<Mutex<HashMap<String, String>>>;
 
 fn main() -> std::io::Result<()> {
-    let listener = TcpListener::bind("146.86.114.51:8000")?;
-    println!("Server started on 146.86.114.51:8000");
+    let local_ip = local_ip().expect("Could not get local IP");
+    let address = format!("{}:{}", local_ip, 8000);
+
+    let listener = TcpListener::bind(&address).expect("Could not bind to address");
+    println!("Server started on {}", address);
 
     let state: SharedState = Arc::new(Mutex::new(HashMap::new()));
 
