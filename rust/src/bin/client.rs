@@ -1,8 +1,12 @@
 use std::net::TcpStream;
+use local_ip_address::local_ip;
 use std::io::{self, Write, Read};
 
 fn main() -> io::Result<()> {
-    let mut stream = TcpStream::connect("146.86.114.51:8000")?;
+    let local_ip = local_ip().expect("Could not get local IP");
+    let address = format!("{}:{}", local_ip, 8000);
+
+    let mut stream = TcpStream::connect(&address).expect("Could not bind to address");
     println!("Requesting access to chat room. Please select a username that has between 3 and 30 characters and only alphanumeric symbols.");
 
     let mut input = String::new();
