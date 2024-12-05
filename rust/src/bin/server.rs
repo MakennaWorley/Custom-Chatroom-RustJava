@@ -1,4 +1,4 @@
-// use serde_json::Value;
+use serde_json::Value;
 use std::collections::HashMap;
 use std::io::{Read, Write};
 use std::net::{TcpListener, TcpStream};
@@ -112,19 +112,20 @@ fn parse_message(message: &str) -> Option<Value> {
 }
 
 fn is_valid_username(username: &str, state: &SharedState) -> bool {
-    if !username.chars().all(|c| c.is_alphanumeric()) {
+    if !(username.chars().all(|c| c.is_alphanumeric())) {
         return false;
     }
 
-    if username.len() < 3 || username.len() > 30 {
+    if username.len() < 3 && username.len() > 30 {
         return false;
     }
 
-    if username == "everyone" {
+    if username == "all" {
         return false;
     }
 
     let state = state.lock().unwrap();
+
     if state.values().any(|v| v == username) {
         return false;
     }
