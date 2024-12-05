@@ -1,7 +1,7 @@
-use std::collections::{HashMap, VecDeque};
+use std::collections::HashMap;
 use std::io::{Read, Write};
 use std::net::{TcpListener, TcpStream};
-use std::sync::{Arc, Condvar, Mutex};
+use std::sync::{Arc, Mutex};
 use std::thread;
 use local_ip_address::local_ip;
 use serde_json::Value;
@@ -32,11 +32,7 @@ fn main() -> std::io::Result<()> {
     Ok(())
 }
 
-fn handle_client(
-    mut stream: TcpStream,
-    state: SharedState,
-    streams: StreamMap,
-) -> std::io::Result<()> {
+fn handle_client(mut stream: TcpStream, state: SharedState, streams: StreamMap) -> std::io::Result<()> {
     let mut buffer = [0; 1024];
     let peer_addr = stream.peer_addr()?.to_string();
 
@@ -66,9 +62,9 @@ fn handle_client(
             .to_string();
         let (command, message) = raw_message.split_once(' ').unwrap_or((raw_message.as_str(), ""));
 
-        println!("Command: {}, Message: {}", command, message);
+        println!("Command: {}, Message: {}(end of message)", command, message);
 
-        let mut response;
+        let response;
 
         match command {
             "JOIN" => {
