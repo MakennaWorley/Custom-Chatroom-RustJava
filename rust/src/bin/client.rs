@@ -2,7 +2,7 @@ use std::net::TcpStream;
 use std::io::{self, Write, Read};
 
 fn main() -> io::Result<()> {
-    let mut stream = TcpStream::connect("127.0.0.1:8000")?;
+    let mut stream = TcpStream::connect("146.86.114.51:8000")?;
     println!("Requesting access to chat room. Please select a username that has between 3 and 30 characters and only alphanumeric symbols.");
 
     let mut input = String::new();
@@ -25,10 +25,23 @@ fn main() -> io::Result<()> {
 
             match response_trimmed {
                 "200 OK" => {
-                    println!("Command was accepted, you should see something posted on the server side or get a message from the server");
+                    println!("Username was accepted");
                 }
                 "400 INVALID USERNAME" => {
                     println!("Invalid username. Please try again.");
+                }
+
+                "200 BYE" => {
+                    println!("Leaving the chatroom");
+                    return Ok(())
+                }
+
+                "200 SEND" => {
+                    println!("Accepted send command");
+                }
+
+                "500 SERVER ERROR\n" => {
+                    println!("Server error");
                 }
                 _ => {
                     println!("Unexpected response from server: {}", response_trimmed);
@@ -36,9 +49,5 @@ fn main() -> io::Result<()> {
             }
         }
     }
-
-    println!("You are now connected.");
-
-    loop {}
 
 }
