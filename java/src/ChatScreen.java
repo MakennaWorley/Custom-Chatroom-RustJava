@@ -36,12 +36,14 @@ public class ChatScreen extends JFrame implements ActionListener, KeyListener
 	private JTextField sendText;
 	private JTextArea displayArea;
 
-	Color purple = new Color(151,153,186); // Purple color
-
+	//Declaring socket components
+	private Socket socket;
+    private BufferedWriter toServer;
+	private static String hostname;
 
 	public static final int PORT = 8000;
-	private Socket socket; //not sure about this one ------------------------
 
+	Color purple = new Color(151,153,186); // Purple color
 
 	public ChatScreen() {
 		/**
@@ -109,18 +111,30 @@ public class ChatScreen extends JFrame implements ActionListener, KeyListener
 		Border titled = BorderFactory.createTitledBorder(etched, "Enter Message Here ...");
 		southPanel.setBorder(titled);
 
+		/**
+		* set up all the components
+		*/
 		sendText = new JTextField(30);
 		sendButton = new JButton("Send");
 		exitButton = new JButton("Exit");
 
+		/**
+		* register the listeners for the different button clicks
+		*/
 		sendText.addKeyListener(this);
 		sendButton.addActionListener(this);
 		exitButton.addActionListener(this);
 
+		/**
+		* add the components to the panel
+		*/
 		southPanel.add(sendText);
 		southPanel.add(sendButton);
 		southPanel.add(exitButton);
 
+		/**
+		* set the title and size of the frame
+		*/
 		displayArea = new JTextArea(15, 40);
 		displayArea.setEditable(false);
 		displayArea.setFont(new Font("SansSerif", Font.PLAIN, 14));
@@ -136,61 +150,6 @@ public class ChatScreen extends JFrame implements ActionListener, KeyListener
 			}
 		});
 	}
-//		/**
-//		 * set up all the components
-//		 */
-//		sendText = new JTextField(30);
-//		sendButton = new JButton("Send");
-//		exitButton = new JButton("Exit");
-//
-//		/**
-//		 * register the listeners for the different button clicks
-//		 */
-//		sendText.addKeyListener(this);
-//		sendButton.addActionListener(this);
-//		exitButton.addActionListener(this);
-//
-//		/**
-//		 * add the components to the panel
-//		 */
-//		p.add(sendText);
-//		p.add(sendButton);
-//		p.add(exitButton);
-//
-//		/**
-//		 * add the panel to the "south" end of the container
-//		 */
-//		getContentPane().add(p,"South");
-//
-//		/**
-//		 * add the text area for displaying output. Associate
-//		 * a scrollbar with this text area. Note we add the scrollpane
-//		 * to the container, not the text area
-//		 */
-//		/**
-//		 * set the title and size of the frame
-//		 */
-//		displayArea = new JTextArea(15, 40);
-//		displayArea.setEditable(false);
-//		displayArea.setFont(new Font("SansSerif", Font.PLAIN, 14));
-//
-//		JScrollPane scrollPane = new JScrollPane(displayArea);
-//		getContentPane().add(scrollPane,"Center");
-//
-//		setTitle("The Cool Chatroom");
-//		pack();
-//
-//		setVisible(true);
-//		sendText.requestFocus();
-//
-//		/** anonymous inner class to handle window closing events */
-//		addWindowListener(new WindowAdapter() {
-//			public void windowClosing(WindowEvent evt) {
-//				System.exit(0);
-//			}
-//		} );
-
-
 
 	/**
 	 * Displays a message
@@ -206,15 +165,17 @@ public class ChatScreen extends JFrame implements ActionListener, KeyListener
 	 */
 	public void actionPerformed(ActionEvent evt) {
 		Object source = evt.getSource();
+		String username = usernameField.getText();
 
 		if (source == joinButton) {
-			String username = usernameField.getText();
 
 			// Validate username
 			if (validateUsername(username)) {
-				// If valid, connect to server and switch to chat panel
-				connectToServer(username);
-				cardLayout.show(mainPanel, "Chat");
+				// If valid, connect to server, send join request and switch to chat panel
+				if (connectToServer()) {
+                    sendJoinRequest(username);
+                    cardLayout.show(mainPanel, "Chat");
+                }
 			}
 			else {
 				usernameField.setText("");
@@ -225,6 +186,7 @@ public class ChatScreen extends JFrame implements ActionListener, KeyListener
 			sendText.setText("");
 			sendText.requestFocus();
 		} else if (source == exitButton) {
+			leaveRequest(username);
 			System.exit(0);
 		}
 	}
@@ -249,21 +211,39 @@ public class ChatScreen extends JFrame implements ActionListener, KeyListener
 		return true;
 	}
 
-	private void connectToServer(String username) {
-		/**
+	private boolean connectToServer() {
 		try {
-			socket = new Socket("localhost", PORT); // Replace with server address
-			displayMessage("Connected as: " + username);
-
-			// Start ReaderThread for incoming messages
-			Thread readerThread = new Thread(new ReaderThread(socket, this));
-			readerThread.start();
-		} catch (IOException e) {
-			JOptionPane.showMessageDialog(this, "Failed to connect to server.", "Connection Error", JOptionPane.ERROR_MESSAGE);
-		}
-	 	**/
+            socket = new Socket(hostname, PORT);
+            toServer = new BufferedWriter(new OutputStreamWriter(socket.getOutputStream()));
+            displayMessage("Connected to server!");
+            return true;
+        } catch (IOException e) {
+            e.printStackTrace();
+            JOptionPane.showMessageDialog(this, "Failed to connect to server.", "Error", JOptionPane.ERROR_MESSAGE);
+            return false;
+        }
 	}
 
+	private void sendJoinRequest(String username) {
+        try {
+            toServer.write("JOIN " + username + "\n");
+            toServer.flush();
+            displayMessage("Joined chat as " + username);
+        } catch (IOException e) {
+            e.printStackTrace();
+            JOptionPane.showMessageDialog(this, "Failed to join the chat room.", "Error", JOptionPane.ERROR_MESSAGE);
+        }
+    }
+
+	private void leaveRequest(String username) {
+        try {
+            toServer.write("LEAVE " + username + "\n");
+            toServer.flush();
+        } catch (IOException e) {
+            e.printStackTrace();
+            JOptionPane.showMessageDialog(this, "Failed to leave the chat room.", "Error", JOptionPane.ERROR_MESSAGE);
+        }
+    }
 
 	/**
 	 * These methods responds to keystroke events and fulfills
@@ -287,26 +267,20 @@ public class ChatScreen extends JFrame implements ActionListener, KeyListener
 
 
 	public static void main(String[] args) {
-		try {
-			Socket annoying = new Socket(args[0], PORT);
-			ChatScreen win = new ChatScreen();
+		if (args.length != 1) {
+			System.out.println("Usage: java ChatScreen <hostname>");
+			System.exit(1);
+		}
+		hostname = args[0];
 
-			String username = win.usernameField.getText();
-			win.displayMessage("Welcome to the chatroom " + username);
+		ChatScreen win = new ChatScreen();
 
-			BufferedWriter toServer = new BufferedWriter(new OutputStreamWriter(annoying.getOutputStream()));
-			toServer.write("JOIN " + username + "\n");
-			toServer.flush();
+		// Thread ReaderThread = new Thread(new ReaderThread(socket, win));
+		// ReaderThread.start();
 
-			Thread ReaderThread = new Thread(new ReaderThread(annoying, win));
-
-
+		if (win.connectToServer()) {
+			Thread ReaderThread = new Thread(new ReaderThread(win.socket, win));
 			ReaderThread.start();
 		}
-		catch (UnknownHostException uhe) { System.out.println(uhe); }
-		catch (IOException ioe) { System.out.println(ioe); }
-
-		//SwingUtilities.invokeLater(ChatScreen::new);
-
 	}
 }

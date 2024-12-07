@@ -27,6 +27,11 @@ public class ReaderThread implements Runnable
 
 				// now display it on the display area
 				screen.displayMessage(message);
+
+
+				//so continually be reading from the server and do statments
+				//if message is 200 OK -> display "joinned chatroom!"
+				//if message is SEND JSON file -> display "message from:_ and message:_"
 			}
 		}
 		catch (IOException ioe) { System.out.println(ioe); }
