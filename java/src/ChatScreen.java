@@ -37,9 +37,10 @@ public class ChatScreen extends JFrame implements ActionListener, KeyListener
 	private JTextArea displayArea;
 
 	//Declaring socket components
-	private Socket socket;
+	private Socket socket = null;
     private BufferedWriter toServer;
 	private static String hostname;
+	private String username;
 
 	public static final int PORT = 8000;
 
@@ -165,9 +166,9 @@ public class ChatScreen extends JFrame implements ActionListener, KeyListener
 	 */
 	public void actionPerformed(ActionEvent evt) {
 		Object source = evt.getSource();
-		String username = usernameField.getText();
 
 		if (source == joinButton) {
+			username = usernameField.getText();
 
 			// Validate username
 			if (validateUsername(username)) {
@@ -186,8 +187,8 @@ public class ChatScreen extends JFrame implements ActionListener, KeyListener
 			sendText.setText("");
 			sendText.requestFocus();
 		} else if (source == exitButton) {
-			leaveRequest(username);
-			System.exit(0);
+			leaveRequest();
+			//System.exit(0);
 		}
 	}
 
@@ -211,11 +212,23 @@ public class ChatScreen extends JFrame implements ActionListener, KeyListener
 		return true;
 	}
 
+	public String getUsername() {
+		return username;
+	}
+
 	private boolean connectToServer() {
+		if (socket != null && !socket.isClosed()) {
+			displayMessage("Already connected to server!");
+			return true;
+		}
 		try {
             socket = new Socket(hostname, PORT);
             toServer = new BufferedWriter(new OutputStreamWriter(socket.getOutputStream()));
             displayMessage("Connected to server!");
+
+			// Start ReaderThread immediately after successful connection
+			Thread ReaderThread = new Thread(new ReaderThread(socket, this));
+			ReaderThread.start();
             return true;
         } catch (IOException e) {
             e.printStackTrace();
@@ -228,16 +241,17 @@ public class ChatScreen extends JFrame implements ActionListener, KeyListener
         try {
             toServer.write("JOIN " + username + "\n");
             toServer.flush();
-            displayMessage("Joined chat as " + username);
+			this.username = username;
+
         } catch (IOException e) {
             e.printStackTrace();
             JOptionPane.showMessageDialog(this, "Failed to join the chat room.", "Error", JOptionPane.ERROR_MESSAGE);
         }
     }
 
-	private void leaveRequest(String username) {
+	private void leaveRequest() {
         try {
-            toServer.write("LEAVE " + username + "\n");
+            toServer.write("LEAVE\n");
             toServer.flush();
         } catch (IOException e) {
             e.printStackTrace();
@@ -274,13 +288,5 @@ public class ChatScreen extends JFrame implements ActionListener, KeyListener
 		hostname = args[0];
 
 		ChatScreen win = new ChatScreen();
-
-		// Thread ReaderThread = new Thread(new ReaderThread(socket, win));
-		// ReaderThread.start();
-
-		if (win.connectToServer()) {
-			Thread ReaderThread = new Thread(new ReaderThread(win.socket, win));
-			ReaderThread.start();
-		}
 	}
 }

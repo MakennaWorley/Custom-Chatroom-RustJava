@@ -19,22 +19,55 @@ public class ReaderThread implements Runnable
 	}
 
 	public void run() {
+		
 		try {
 			fromServer = new BufferedReader(new InputStreamReader(server.getInputStream()));
+			System.out.println("Socket successfully passed over: " + server);
 
 			while (true) {
+				System.out.println("Waiting for message from server...");
 				String message = fromServer.readLine();
-
+				if (message == null) {
+					System.out.println("Server connection closed.");
+					break;
+				}
 				// now display it on the display area
-				screen.displayMessage(message);
+				// Parse the message
+				String[] parts = message.split(" ", 2); // Split into command and the rest of the message
+				String command = parts[0]; // The first part is the command
+				String payload = parts.length > 1 ? parts[1] : ""; // The second part is the payload (if any)
 
+				// Handle commands
+				switch (command) {
+					case "200":
+						if (payload.startsWith("OK")) {
+							String username = screen.getUsername();
+							screen.displayMessage("Joined chatroom as " + username);
+							System.out.println("User joined: " + username);
+						} else if (payload.startsWith("BYE")) {
+							JOptionPane.showMessageDialog(null, "Disconnected from the server.", "Disconnected", JOptionPane.INFORMATION_MESSAGE);
+							System.out.println("Server requested disconnection.");
+							System.exit(0); // Close the application
+						}
+						break;
 
-				//so continually be reading from the server and do statments
-				//if message is 200 OK -> display "joinned chatroom!"
-				//if message is SEND JSON file -> display "message from:_ and message:_"
+					default:
+						System.out.println("Unknown command from server: " + command);
+						break;
+				}
+
+		// 		//displayMessage("Joined chat as " + username);
+
+		// 		//so continually be reading from the server and do statments
+		// 		//if message is 200 OK -> display "joinned chatroom!"
+		// 		//if message is SEND JSON file -> display "message from:_ and message:_"
 			}
 		}
-		catch (IOException ioe) { System.out.println(ioe); }
+		catch (IOException ioe) { 
+			System.out.println("Error reading from server: " + ioe.getMessage());
+		}
+
+
 
 	}
 }
