@@ -1,20 +1,21 @@
+use dashmap::DashMap;
+use local_ip_address::local_ip;
+use serde_json::Value;
 use std::collections::HashMap;
 use std::io::{Read, Write};
 use std::net::{TcpListener, TcpStream};
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, RwLock};
 use std::thread;
-use local_ip_address::local_ip;
-use serde_json::Value;
 
-type SharedState = Arc<Mutex<HashMap<String, (String, String)>>>;
-type StreamMap = Arc<Mutex<HashMap<String, TcpStream>>>;
+type SharedState = Arc<RwLock<HashMap<String, (String, String)>>>;
+type StreamMap = Arc<DashMap<String, TcpStream>>;
 
 fn main() -> std::io::Result<()> {
     let local_ip = local_ip().expect("Could not get local IP");
     let address = format!("{}:{}", local_ip, 8000);
 
-    let state: SharedState = Arc::new(Mutex::new(HashMap::new()));
-    let streams: StreamMap = Arc::new(Mutex::new(HashMap::new()));
+    let state: SharedState = Arc::new(RwLock::new(HashMap::new()));
+    let streams: StreamMap = Arc::new(DashMap::new());
 
     let listener = TcpListener::bind(address.clone())?;
     println!("Server running on {}", address);
@@ -36,46 +37,45 @@ fn handle_client(mut stream: TcpStream, state: SharedState, streams: StreamMap) 
     let mut buffer = [0; 1024];
     let peer_addr = stream.peer_addr()?.to_string();
 
-    {
-        let mut streams = streams.lock().unwrap();
-        streams.insert(peer_addr.clone(), stream.try_clone()?);
-    }
+    println!("[SERVER] New connection from {}", peer_addr);
+    //let testing = "100 TESTING\n";
+    //stream.write_all(testing.as_bytes())?;
+
+    streams.insert(peer_addr.clone(), stream.try_clone()?);
 
     loop {
         let size = match stream.read(&mut buffer) {
             Ok(size) if size == 0 => {
+                println!("[SERVER] Client {} disconnected", peer_addr);
                 cleanup_user(&peer_addr, &state, &streams);
-                println!("Client {} disconnected", peer_addr);
                 return Ok(());
             }
             Ok(size) => size,
             Err(e) => {
+                eprintln!("[SERVER ERROR] Error reading from client {}: {}", peer_addr, e);
                 cleanup_user(&peer_addr, &state, &streams);
-                eprintln!("Error reading from client {}: {}", peer_addr, e);
                 return Err(e);
             }
         };
 
         let raw_message = String::from_utf8_lossy(&buffer[..size])
             .trim()
-            .trim_end_matches('\n')
             .to_string();
-        let (command, message) = raw_message.split_once(' ').unwrap_or((raw_message.as_str(), ""));
+        println!("[SERVER] Received message from {}: {}", peer_addr, raw_message);
 
-        println!("Command: {}, Message: {}(end of message)", command, message);
+        let (command, message) = raw_message.split_once(' ').unwrap_or((raw_message.as_str(), ""));
+        println!("[SERVER] Parsed command: {}, message: {}", command, message);
 
         let response;
 
         match command {
             "JOIN" => {
                 if is_valid_username(&message, &state) {
-                    {
-                        let mut state = state.lock().unwrap();
-                        state.insert(peer_addr.clone(), (message.to_string(), "online".to_string()));
-                    }
-                    println!("{} has joined from {}", message, peer_addr);
+                    state.write().unwrap().insert(peer_addr.clone(), (message.to_string(), "ONLINE".to_string()));
+                    println!("[SERVER] {} joined from {}", message, peer_addr);
                     response = "200 OK\n".to_string();
                 } else {
+                    println!("[SERVER] Invalid username from {}: {}", peer_addr, message);
                     response = "400 INVALID USERNAME\n".to_string();
                 }
             }
@@ -85,46 +85,65 @@ fn handle_client(mut stream: TcpStream, state: SharedState, streams: StreamMap) 
             }
             "SEND" => {
                 if let Ok(parsed_message) = serde_json::from_str::<Value>(message) {
-                    // Forward the JSON object to all recipients
-                    let streams = streams.lock().unwrap();
-                    if let Some(header) = parsed_message["header"].as_str() {
-                        if header == "@all" {
-                            for (_addr, stream) in streams.iter() {
-                                let _ = send_to_user(stream, &parsed_message);
-                            }
-                            response = "200 SENT\n".to_string();
-                        } else {
-                            // Handle sending to specific users if required
-                            let recipients: Vec<&str> = header.split_whitespace().collect();
+                    if parsed_message["header"].as_str() == Some("@all") {
+                        broadcast_message(&streams, &parsed_message, Some(&peer_addr))?;
+                        response = "200 SENT\n".to_string();
+                    } else if let Some(header) = parsed_message["header"].as_str() {
+                        let mut all_sent = false;
+                        let recipients: Vec<&str> = header
+                            .split_whitespace()
+                            .filter(|word| word.starts_with('@'))
+                            .map(|user| user.trim_start_matches('@'))
+                            .collect();
+
+                        if !recipients.is_empty() {
+                            let state = state.read().unwrap();
                             for recipient in recipients {
-                                let recipient_username = recipient.strip_prefix("@").unwrap_or("");
-                                if let Some((_peer_addr, (_username, _status))) = state
-                                    .lock()
-                                    .unwrap()
-                                    .iter()
-                                    .find(|(_, (u, _))| u == recipient_username)
-                                {
-                                    if let Some(stream) = streams.get(_peer_addr) {
-                                        let _ = send_to_user(stream, &parsed_message);
+                                println!("Finding {}", recipient);
+                                if let Some((ip, _)) = state.iter().find(|(_, (name, _))| name == recipient) {
+                                    if let Some(user_stream) = streams.get(ip) {
+                                        if let Err(e) = send_to_user(&user_stream, &parsed_message) {
+                                            eprintln!("[SERVER ERROR] Failed to send message to {}: {}", recipient, e);
+                                            all_sent = false;
+                                        } else {
+                                            println!("[SERVER] Message sent to {}", recipient);
+                                            all_sent = true;
+                                        }
+                                    } else {
+                                        eprintln!("[SERVER] No active stream for recipient {}", recipient);
+                                        all_sent = false;
                                     }
+                                } else {
+                                    eprintln!("[SERVER] Recipient {} not found in state", recipient);
+                                    all_sent = false;
                                 }
                             }
-                            response = "200 SENT\n".to_string();
+                            if all_sent {
+                                response = "200 SENT\n".to_string();
+                            } else {
+                                response = "400 MESSAGE FAILED\n".to_string();
+                            }
+                        } else {
+                            response = "400 INVALID HEADER\n".to_string();
                         }
                     } else {
-                        response = "400 MESSAGE FAILED\n".to_string();
+                        response = "400 INVALID HEADER\n".to_string();
                     }
                 } else {
-                    response = "400 MESSAGE FAILED\n".to_string();
+                    eprintln!("[SERVER ERROR] Invalid JSON message from {}: {}", peer_addr, message);
+                    response = "400 INVALID MESSAGE\n".to_string();
                 }
             }
             "USERBOARD" => {
+                println!("User is requesting the userboard");
                 response = user_board(&state);
             }
             "USERSTATUS" => {
+                println!("User is requesting to change their status");
                 response = user_status_update(message, &state);
             }
             _ => {
+                eprintln!("[SERVER ERROR] Unknown command from {}: {}", peer_addr, command);
                 response = "500 SERVER ERROR\n".to_string();
             }
         }
@@ -146,7 +165,7 @@ fn is_valid_username(username: &str, state: &SharedState) -> bool {
         return false;
     }
 
-    let state = state.lock().unwrap();
+    let state = state.read().unwrap();
     if state.values().any(|v| v.0 == username) {
         return false;
     }
@@ -155,19 +174,13 @@ fn is_valid_username(username: &str, state: &SharedState) -> bool {
 }
 
 fn cleanup_user(peer_addr: &str, state: &SharedState, streams: &StreamMap) {
-    {
-        let mut state = state.lock().unwrap();
-        state.remove(peer_addr);
-    }
-    {
-        let mut streams = streams.lock().unwrap();
-        streams.remove(peer_addr);
-    }
+    state.write().unwrap().remove(peer_addr);
+    streams.remove(peer_addr);
     println!("Cleaned up user and stream for {}", peer_addr);
 }
 
 fn user_board(state: &SharedState) -> String {
-    let state = state.lock().unwrap();
+    let state = state.read().unwrap();
 
     let userboard: HashMap<String, String> = state
         .values()
@@ -194,7 +207,7 @@ fn user_status_update(message: &str, state: &SharedState) -> String {
         return "400 INVALID REQUEST\n".to_string();
     }
 
-    let mut state = state.lock().unwrap();
+    let mut state = state.write().unwrap();
     for (_, (user, status)) in state.iter_mut() {
         if user == username {
             *status = new_status.to_string();
@@ -205,8 +218,23 @@ fn user_status_update(message: &str, state: &SharedState) -> String {
     "400 INVALID REQUEST\n".to_string()
 }
 
+fn broadcast_message(streams: &StreamMap, message: &Value, exclude_addr: Option<&str>) -> std::io::Result<()> {
+    let message_string = serde_json::to_string(message)?;
+    println!("[SERVER] Broadcasting {}", message_string);
+    for entry in streams.iter() {
+        let (addr, mut stream) = entry.pair(); // Mark `stream` as mutable
+        if Some(addr.as_str()) == exclude_addr {
+            continue;
+        }
+        if let Err(e) = stream.write_all(format!("200 SEND {}\n", message_string).as_bytes()) {
+            eprintln!("[SERVER ERROR] Failed to send message to {}: {}", addr, e);
+        }
+    }
+    Ok(())
+}
+
 fn send_to_user(mut stream: &TcpStream, json_message: &Value) -> std::io::Result<()> {
-    // Convert the JSON object back to a string and send it
     let json_string = serde_json::to_string(json_message)?;
+    println!("[SERVER] Sending private message {}", json_string);
     stream.write_all(format!("200 SEND {}\n", json_string).as_bytes())
 }
