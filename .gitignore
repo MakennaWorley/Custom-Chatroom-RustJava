@@ -1,5 +1,6 @@
 .DS_store
 *.log
+*.class
 
 java/.idea
 java/java.iml
