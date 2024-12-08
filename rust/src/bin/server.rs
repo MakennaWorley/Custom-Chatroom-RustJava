@@ -99,7 +99,9 @@ fn handle_client(mut stream: TcpStream, state: SharedState, streams: StreamMap) 
                         if !recipients.is_empty() {
                             let state = state.read().unwrap();
                             for recipient in recipients {
+
                                 println!("[SERVER] Finding {}", recipient);
+
                                 if let Some((ip, _)) = state.iter().find(|(_, (name, _))| name == recipient) {
                                     if let Some(user_stream) = streams.get(ip) {
                                         if let Err(e) = send_to_user(&user_stream, &parsed_message) {
@@ -114,7 +116,9 @@ fn handle_client(mut stream: TcpStream, state: SharedState, streams: StreamMap) 
                                         all_sent = false;
                                     }
                                 } else {
+
                                     eprintln!("[SERVER ERROR] Recipient {} not found in state", recipient);
+
                                     all_sent = false;
                                 }
                             }

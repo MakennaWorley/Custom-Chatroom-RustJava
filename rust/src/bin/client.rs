@@ -192,8 +192,14 @@ fn process_server_response(response_trimmed: &str) {
             "200 SENT" => {
                 println!("Message in queue to be sent");
             }
+            "400 MESSAGE FAILED" => {
+                println!("Could not send message");
+            }
             "200 USERSTATUS UPDATED" => {
                 println!("Accepted user status change command");
+            }
+            "400 INVALID REQUEST" => {
+                println!("Could not update user status");
             }
             "500 SERVER ERROR" => {
                 println!("Server error");
