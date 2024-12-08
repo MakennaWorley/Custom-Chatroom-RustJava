@@ -32,9 +32,12 @@ public class ChatScreen extends JFrame implements ActionListener, KeyListener
 	// Declaring chat screen components
 	private JPanel chatPanel;
 	private JButton sendButton;
-	private JButton exitButton;
 	private JTextField sendText;
 	private JTextArea displayArea;
+	private JButton userBoardButton;
+	private JButton userStatusButton;
+	private JButton leaveButton;
+
 
 	//Declaring socket components
 	private Socket socket = null;
@@ -44,7 +47,11 @@ public class ChatScreen extends JFrame implements ActionListener, KeyListener
 
 	public static final int PORT = 8000;
 
-	Color purple = new Color(151,153,186); // Purple color
+	Color purple = new Color(151,153,186);
+	Color lightpink = new Color(249,225,224);
+	Color lightpurple = new Color(188,133,163);
+	Color redish = new Color(149,20,29);
+
 
 	public ChatScreen() {
 		/**
@@ -106,6 +113,16 @@ public class ChatScreen extends JFrame implements ActionListener, KeyListener
 
 	private void createChatPanel() {
 		chatPanel = new JPanel(new BorderLayout());
+		chatPanel.setPreferredSize(new Dimension(800, 600)); // Set the preferred size
+
+		// Create the North panel for buttons
+		JPanel northPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+		userBoardButton = new JButton("User Board");
+		userStatusButton = new JButton("User Status");
+		leaveButton = new JButton("Leave");
+		northPanel.setBackground(lightpurple);
+
+		JPanel westPanel = new JPanel();
 
 		JPanel southPanel = new JPanel();
 		Border etched = BorderFactory.createEtchedBorder();
@@ -117,21 +134,40 @@ public class ChatScreen extends JFrame implements ActionListener, KeyListener
 		*/
 		sendText = new JTextField(30);
 		sendButton = new JButton("Send");
-		exitButton = new JButton("Exit");
 
 		/**
 		* register the listeners for the different button clicks
 		*/
 		sendText.addKeyListener(this);
 		sendButton.addActionListener(this);
-		exitButton.addActionListener(this);
+		userBoardButton.addActionListener(this);
+		userStatusButton.addActionListener(this);
+		leaveButton.addActionListener(this);
+
+		userBoardButton.setBackground(lightpink);
+		userBoardButton.setOpaque(true);
+		userBoardButton.setBorderPainted(false);
+		userStatusButton.setBackground(lightpink);
+		userStatusButton.setOpaque(true);
+		userStatusButton.setBorderPainted(false);
+		leaveButton.setBackground(redish);
+		leaveButton.setOpaque(true);
+		leaveButton.setBorderPainted(false);
+		leaveButton.setForeground(Color.WHITE);
+
+
+		sendButton.setBackground(lightpurple);
+		sendButton.setOpaque(true);
+		sendButton.setBorderPainted(false);
 
 		/**
 		* add the components to the panel
 		*/
 		southPanel.add(sendText);
 		southPanel.add(sendButton);
-		southPanel.add(exitButton);
+		northPanel.add(userBoardButton);
+		northPanel.add(userStatusButton);
+		northPanel.add(leaveButton);
 
 		/**
 		* set the title and size of the frame
@@ -142,7 +178,10 @@ public class ChatScreen extends JFrame implements ActionListener, KeyListener
 
 		JScrollPane scrollPane = new JScrollPane(displayArea);
 		chatPanel.add(scrollPane, BorderLayout.CENTER);
+		// Add panels to the chatPanel
+		chatPanel.add(northPanel, BorderLayout.NORTH);
 		chatPanel.add(southPanel, BorderLayout.SOUTH);
+		chatPanel.add(westPanel, BorderLayout.WEST);
 
 		/** anonymous inner class to handle window closing events */
 		addWindowListener(new WindowAdapter() {
@@ -176,6 +215,8 @@ public class ChatScreen extends JFrame implements ActionListener, KeyListener
 				if (connectToServer()) {
                     sendJoinRequest(username);
                     cardLayout.show(mainPanel, "Chat");
+					mainPanel.revalidate();
+					mainPanel.repaint();
                 }
 			}
 			else {
@@ -186,9 +227,14 @@ public class ChatScreen extends JFrame implements ActionListener, KeyListener
 			displayMessage(message);
 			sendText.setText("");
 			sendText.requestFocus();
-		} else if (source == exitButton) {
+		} else if (source == leaveButton) {
 			leaveRequest();
-			//System.exit(0);
+		}
+		else if(source == userBoardButton) {
+
+		}
+		else if (source == userStatusButton) {
+
 		}
 	}
 
@@ -258,6 +304,22 @@ public class ChatScreen extends JFrame implements ActionListener, KeyListener
             JOptionPane.showMessageDialog(this, "Failed to leave the chat room.", "Error", JOptionPane.ERROR_MESSAGE);
         }
     }
+
+	private void getUserBoard() {
+		try {
+			toServer.write("USERBOARD\n");
+			toServer.flush();
+			this.username = username;
+
+		} catch (IOException e) {
+			e.printStackTrace();
+			JOptionPane.showMessageDialog(this, "Failed to send request for the user board list.", "Error", JOptionPane.ERROR_MESSAGE);
+		}
+	}
+
+	private void getUserStatus() {
+
+	}
 
 	/**
 	 * These methods responds to keystroke events and fulfills
