@@ -18,7 +18,7 @@ fn main() -> std::io::Result<()> {
     let streams: StreamMap = Arc::new(DashMap::new());
 
     let listener = TcpListener::bind(address.clone())?;
-    println!("Server running on {}", address);
+    println!("[SERVER] Server running on {}", address);
 
     for stream in listener.incoming() {
         let stream = stream?;
@@ -99,7 +99,9 @@ fn handle_client(mut stream: TcpStream, state: SharedState, streams: StreamMap) 
                         if !recipients.is_empty() {
                             let state = state.read().unwrap();
                             for recipient in recipients {
-                                println!("Finding {}", recipient);
+
+                                println!("[SERVER] Finding {}", recipient);
+
                                 if let Some((ip, _)) = state.iter().find(|(_, (name, _))| name == recipient) {
                                     if let Some(user_stream) = streams.get(ip) {
                                         if let Err(e) = send_to_user(&user_stream, &parsed_message) {
@@ -114,7 +116,9 @@ fn handle_client(mut stream: TcpStream, state: SharedState, streams: StreamMap) 
                                         all_sent = false;
                                     }
                                 } else {
-                                    eprintln!("[SERVER] Recipient {} not found in state", recipient);
+
+                                    eprintln!("[SERVER ERROR] Recipient {} not found in state", recipient);
+
                                     all_sent = false;
                                 }
                             }
@@ -135,11 +139,11 @@ fn handle_client(mut stream: TcpStream, state: SharedState, streams: StreamMap) 
                 }
             }
             "USERBOARD" => {
-                println!("User is requesting the userboard");
+                println!("[SERVER] User is requesting the userboard");
                 response = user_board(&state);
             }
             "USERSTATUS" => {
-                println!("User is requesting to change their status");
+                println!("[SERVER] User is requesting to change their status");
                 response = user_status_update(message, &state);
             }
             _ => {
@@ -176,7 +180,7 @@ fn is_valid_username(username: &str, state: &SharedState) -> bool {
 fn cleanup_user(peer_addr: &str, state: &SharedState, streams: &StreamMap) {
     state.write().unwrap().remove(peer_addr);
     streams.remove(peer_addr);
-    println!("Cleaned up user and stream for {}", peer_addr);
+    println!("[SERVER] Cleaned up user and stream for {}", peer_addr);
 }
 
 fn user_board(state: &SharedState) -> String {
