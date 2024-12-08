@@ -3,9 +3,11 @@
  * it writes it to the ChatScreen text area using the displayMessage() method.
  */
 
-import java.io.*;
-import java.net.*;
 import javax.swing.*;
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.net.Socket;
 
 public class ReaderThread implements Runnable
 {
@@ -48,6 +50,8 @@ public class ReaderThread implements Runnable
 							JOptionPane.showMessageDialog(null, "Disconnected from the server.", "Disconnected", JOptionPane.INFORMATION_MESSAGE);
 							System.out.println("Server requested disconnection.");
 							System.exit(0); // Close the application
+						} else if (payload.startsWith("BOARD")) {
+
 						}
 						break;
 
