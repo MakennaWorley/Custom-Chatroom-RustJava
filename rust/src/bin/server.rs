@@ -38,8 +38,8 @@ fn handle_client(mut stream: TcpStream, state: SharedState, streams: StreamMap) 
     let peer_addr = stream.peer_addr()?.to_string();
 
     println!("[SERVER] New connection from {}", peer_addr);
-    let testing = "100 TESTING\n";
-    stream.write_all(testing.as_bytes())?;
+    //let testing = "100 TESTING\n";
+    //stream.write_all(testing.as_bytes())?;
 
     streams.insert(peer_addr.clone(), stream.try_clone()?);
 
@@ -87,7 +87,6 @@ fn handle_client(mut stream: TcpStream, state: SharedState, streams: StreamMap) 
                 if let Ok(parsed_message) = serde_json::from_str::<Value>(message) {
                     if parsed_message["header"].as_str() == Some("@all") {
                         broadcast_message(&streams, &parsed_message, Some(&peer_addr))?;
-                        //broadcast_message(&streams, &parsed_message)?;
                         response = "200 SENT\n".to_string();
                     } else if let Some(header) = parsed_message["header"].as_str() {
                         let mut all_sent = false;
@@ -233,18 +232,6 @@ fn broadcast_message(streams: &StreamMap, message: &Value, exclude_addr: Option<
     }
     Ok(())
 }
-
-/*fn broadcast_message(streams: &StreamMap, message: &Value) -> std::io::Result<()> {
-    let message_string = serde_json::to_string(message)?;
-    println!("[SERVER] Broadcasting {}", message_string);
-    for entry in streams.iter() {
-        let (addr, mut stream) = entry.pair(); // Mark `stream` as mutable
-        if let Err(e) = stream.write_all(format!("200 SEND {}\n", message_string).as_bytes()) {
-            eprintln!("[SERVER ERROR] Failed to send message to {}: {}", addr, e);
-        }
-    }
-    Ok(())
-}*/
 
 fn send_to_user(mut stream: &TcpStream, json_message: &Value) -> std::io::Result<()> {
     let json_string = serde_json::to_string(json_message)?;
