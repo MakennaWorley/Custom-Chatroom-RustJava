@@ -18,7 +18,7 @@ fn main() -> std::io::Result<()> {
     let streams: StreamMap = Arc::new(DashMap::new());
 
     let listener = TcpListener::bind(address.clone())?;
-    println!("Server running on {}", address);
+    println!("[SERVER] Server running on {}", address);
 
     for stream in listener.incoming() {
         let stream = stream?;
@@ -38,8 +38,8 @@ fn handle_client(mut stream: TcpStream, state: SharedState, streams: StreamMap) 
     let peer_addr = stream.peer_addr()?.to_string();
 
     println!("[SERVER] New connection from {}", peer_addr);
-    //let testing = "100 TESTING\n";
-    //stream.write_all(testing.as_bytes())?;
+    let testing = "100 TESTING\n";
+    stream.write_all(testing.as_bytes())?;
 
     streams.insert(peer_addr.clone(), stream.try_clone()?);
 
@@ -87,6 +87,7 @@ fn handle_client(mut stream: TcpStream, state: SharedState, streams: StreamMap) 
                 if let Ok(parsed_message) = serde_json::from_str::<Value>(message) {
                     if parsed_message["header"].as_str() == Some("@all") {
                         broadcast_message(&streams, &parsed_message, Some(&peer_addr))?;
+                        //broadcast_message(&streams, &parsed_message)?;
                         response = "200 SENT\n".to_string();
                     } else if let Some(header) = parsed_message["header"].as_str() {
                         let mut all_sent = false;
@@ -99,7 +100,7 @@ fn handle_client(mut stream: TcpStream, state: SharedState, streams: StreamMap) 
                         if !recipients.is_empty() {
                             let state = state.read().unwrap();
                             for recipient in recipients {
-                                println!("Finding {}", recipient);
+                                println!("[SERVER] Finding {}", recipient);
                                 if let Some((ip, _)) = state.iter().find(|(_, (name, _))| name == recipient) {
                                     if let Some(user_stream) = streams.get(ip) {
                                         if let Err(e) = send_to_user(&user_stream, &parsed_message) {
@@ -114,7 +115,7 @@ fn handle_client(mut stream: TcpStream, state: SharedState, streams: StreamMap) 
                                         all_sent = false;
                                     }
                                 } else {
-                                    eprintln!("[SERVER] Recipient {} not found in state", recipient);
+                                    eprintln!("[SERVER ERROR] Recipient {} not found in state", recipient);
                                     all_sent = false;
                                 }
                             }
@@ -135,11 +136,11 @@ fn handle_client(mut stream: TcpStream, state: SharedState, streams: StreamMap) 
                 }
             }
             "USERBOARD" => {
-                println!("User is requesting the userboard");
+                println!("[SERVER] User is requesting the userboard");
                 response = user_board(&state);
             }
             "USERSTATUS" => {
-                println!("User is requesting to change their status");
+                println!("[SERVER] User is requesting to change their status");
                 response = user_status_update(message, &state);
             }
             _ => {
@@ -176,7 +177,7 @@ fn is_valid_username(username: &str, state: &SharedState) -> bool {
 fn cleanup_user(peer_addr: &str, state: &SharedState, streams: &StreamMap) {
     state.write().unwrap().remove(peer_addr);
     streams.remove(peer_addr);
-    println!("Cleaned up user and stream for {}", peer_addr);
+    println!("[SERVER] Cleaned up user and stream for {}", peer_addr);
 }
 
 fn user_board(state: &SharedState) -> String {
@@ -232,6 +233,18 @@ fn broadcast_message(streams: &StreamMap, message: &Value, exclude_addr: Option<
     }
     Ok(())
 }
+
+/*fn broadcast_message(streams: &StreamMap, message: &Value) -> std::io::Result<()> {
+    let message_string = serde_json::to_string(message)?;
+    println!("[SERVER] Broadcasting {}", message_string);
+    for entry in streams.iter() {
+        let (addr, mut stream) = entry.pair(); // Mark `stream` as mutable
+        if let Err(e) = stream.write_all(format!("200 SEND {}\n", message_string).as_bytes()) {
+            eprintln!("[SERVER ERROR] Failed to send message to {}: {}", addr, e);
+        }
+    }
+    Ok(())
+}*/
 
 fn send_to_user(mut stream: &TcpStream, json_message: &Value) -> std::io::Result<()> {
     let json_string = serde_json::to_string(json_message)?;
