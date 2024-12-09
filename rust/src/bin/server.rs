@@ -91,7 +91,7 @@ fn handle_client(mut stream: TcpStream, state: SharedState, streams: StreamMap) 
                         if !(1..=500).contains(&trimmed_content.len()) {
                             eprintln!("[SERVER ERROR] Message content length invalid: {}", trimmed_content.len());
                             response = "400 MESSAGE FAILED\n".to_string();
-                        } else if parsed_message["header"].as_str() == Some("@all") {
+                        } else if parsed_message["header"].as_str().map(|header| header.trim()) == Some("@all") {
                             broadcast_message(&streams, &parsed_message, Some(&peer_addr))?;
                             response = "200 SENT\n".to_string();
                         } else if let Some(header) = parsed_message["header"].as_str() {

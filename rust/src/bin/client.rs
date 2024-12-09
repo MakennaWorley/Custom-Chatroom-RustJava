@@ -9,6 +9,7 @@ use std::time::Duration;
 
 fn main() -> io::Result<()> {
     let local_ip = local_ip_address::local_ip().expect("Could not get local IP");
+    //let local_ip = ""; //for running on others devices
     let address = format!("{}:{}", local_ip, 8000);
     let stream = TcpStream::connect(&address).expect("Could not connect to server");
 
