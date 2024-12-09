@@ -66,7 +66,7 @@ fn handle_client(mut stream: TcpStream, state: SharedState, streams: StreamMap) 
         let (command, message) = raw_message.split_once(' ').unwrap_or((raw_message.as_str(), ""));
         println!("[SERVER] Parsed command: {}, message: {}", command, message);
 
-        let response;
+        let mut response= "500 SERVER ERROR\n".to_string();
 
         match command {
             "JOIN" => {
@@ -128,14 +128,14 @@ fn handle_client(mut stream: TcpStream, state: SharedState, streams: StreamMap) 
                                 response = "400 MESSAGE FAILED\n".to_string();
                             }
                         } else {
-                            response = "400 INVALID HEADER\n".to_string();
+                            response = "400 MESSAGE FAILED\n".to_string();
                         }
                     } else {
-                        response = "400 INVALID HEADER\n".to_string();
+                        response = "400 MESSAGE FAILED\n".to_string();
                     }
                 } else {
                     eprintln!("[SERVER ERROR] Invalid JSON message from {}: {}", peer_addr, message);
-                    response = "400 INVALID MESSAGE\n".to_string();
+                    response = "400 MESSAGE FAILED\n".to_string();
                 }
             }
             "USERBOARD" => {
@@ -226,7 +226,7 @@ fn broadcast_message(streams: &StreamMap, message: &Value, exclude_addr: Option<
     let message_string = serde_json::to_string(message)?;
     println!("[SERVER] Broadcasting {}", message_string);
     for entry in streams.iter() {
-        let (addr, mut stream) = entry.pair(); // Mark `stream` as mutable
+        let (addr, mut stream) = entry.pair();
         if Some(addr.as_str()) == exclude_addr {
             continue;
         }
