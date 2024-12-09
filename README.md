@@ -15,4 +15,12 @@ Then cd into the rust directory from this repo, run ```cargo build``` and then r
 
 To run the client:
 
-COMING SOON
+Make sure you have Java installed on your device ()
+
+cd into ...
+
+java ChatScreen <hostname>
+
+Make sure maven installed too and run mvn clean install
+
+Reload all maven dependencies if getting error
