@@ -24,6 +24,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
+import javax.swing.text.*;
 
 public class ChatScreen extends JFrame implements ActionListener, KeyListener
 {
@@ -142,6 +143,9 @@ public class ChatScreen extends JFrame implements ActionListener, KeyListener
 		sendText = new JTextField(30);
 		sendButton = new JButton("Send");
 
+		// Limit to 500 characters
+		((AbstractDocument) sendText.getDocument()).setDocumentFilter(new LengthFilter(500));
+
 		/**
 		* register the listeners for the different button clicks
 		*/
@@ -190,6 +194,7 @@ public class ChatScreen extends JFrame implements ActionListener, KeyListener
 		chatPanel.add(northPanel, BorderLayout.NORTH);
 		chatPanel.add(southPanel, BorderLayout.SOUTH);
 		chatPanel.add(westPanel, BorderLayout.WEST);
+
 
 		/** anonymous inner class to handle window closing events */
 		addWindowListener(new WindowAdapter() {
@@ -509,6 +514,35 @@ public class ChatScreen extends JFrame implements ActionListener, KeyListener
 
 	private void getUserStatus() {
 		//not implementing it currently
+	}
+
+	// Custom DocumentFilter to limit input length
+	static class LengthFilter extends DocumentFilter {
+		private final int maxLength;
+
+		public LengthFilter(int maxLength) {
+			this.maxLength = maxLength;
+		}
+
+		@Override
+		public void insertString(FilterBypass fb, int offset, String string, AttributeSet attr) throws BadLocationException {
+			if (fb.getDocument().getLength() + string.length() <= maxLength) {
+				super.insertString(fb, offset, string, attr);
+			} else {
+				// Optionally, play a beep or show a warning
+				Toolkit.getDefaultToolkit().beep();
+			}
+		}
+
+		@Override
+		public void replace(FilterBypass fb, int offset, int length, String text, AttributeSet attrs) throws BadLocationException {
+			if (fb.getDocument().getLength() - length + text.length() <= maxLength) {
+				super.replace(fb, offset, length, text, attrs);
+			} else {
+				// Optionally, play a beep or show a warning
+				Toolkit.getDefaultToolkit().beep();
+			}
+		}
 	}
 
 	/**
