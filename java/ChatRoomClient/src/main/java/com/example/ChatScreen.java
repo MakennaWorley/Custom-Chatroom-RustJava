@@ -54,6 +54,7 @@ public class ChatScreen extends JFrame implements ActionListener, KeyListener
 	private String username;
 
 	public static final int PORT = 8000;
+	public String jsonMessage;
 
 	Color purple = new Color(151,153,186);
 	Color lightpink = new Color(249,225,224);
@@ -130,7 +131,6 @@ public class ChatScreen extends JFrame implements ActionListener, KeyListener
 		leaveButton = new JButton("Leave");
 		northPanel.setBackground(lightpurple);
 
-		JPanel westPanel = new JPanel();
 
 		JPanel southPanel = new JPanel();
 		Border etched = BorderFactory.createEtchedBorder();
@@ -193,7 +193,6 @@ public class ChatScreen extends JFrame implements ActionListener, KeyListener
 		// Add panels to the chatPanel
 		chatPanel.add(northPanel, BorderLayout.NORTH);
 		chatPanel.add(southPanel, BorderLayout.SOUTH);
-		chatPanel.add(westPanel, BorderLayout.WEST);
 
 
 		/** anonymous inner class to handle window closing events */
@@ -211,12 +210,24 @@ public class ChatScreen extends JFrame implements ActionListener, KeyListener
 		// Create a JPanel to act as the message box
 		JPanel messageBox = new JPanel();
 		messageBox.setLayout(new GridBagLayout());
-		messageBox.setBackground(new Color(220, 220, 220)); // Light gray background
+
+		String username = getUsername();
+		// Extract the sender's name from the message
+		String senderName = message.contains(" ") ? message.split(" ")[0].trim() : "";
+		System.out.println("senderName " + senderName);
+		// Check if the sender's name matches the username
+		boolean isOwnMessage = senderName.equals(username);
+
+		messageBox.setOpaque(true);
+		if (isOwnMessage) {
+			messageBox.setBackground(purple); // Light purple for own messages
+		} else {
+			messageBox.setBackground(new Color(220, 220, 220)); // Light gray for others
+		}
 		messageBox.setBorder(BorderFactory.createCompoundBorder(
 				BorderFactory.createLineBorder(Color.GRAY, 1), // Outer line border
 				BorderFactory.createEmptyBorder(2, 2, 2, 2) // Padding inside the panel
 		));
-		messageBox.setOpaque(true);
 
 		// Create a JLabel for the text
 		JLabel messageLabel = new JLabel(message);
@@ -226,11 +237,14 @@ public class ChatScreen extends JFrame implements ActionListener, KeyListener
 		// Add the JLabel to the message box
 		messageBox.add(messageLabel);
 
-		messageBox.setPreferredSize(new Dimension(messageLabel.getPreferredSize().width + 10, messageLabel.getPreferredSize().height + 10));
+		messageBox.setPreferredSize(new Dimension(messageLabel.getPreferredSize().width + 15, messageLabel.getPreferredSize().height + 15));
 
 		// Wrap the messageBox in a JPanel to use FlowLayout
-		JPanel wrapperPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 0, 0));
+		JPanel wrapperPanel = new JPanel(new FlowLayout(isOwnMessage ? FlowLayout.RIGHT : FlowLayout.LEFT, 0, 0));
 		wrapperPanel.setBackground(Color.WHITE); // Match the background of the display area
+
+		//if the message starts with the username, flowlayout.right and change color to lightpurple
+
 		wrapperPanel.add(messageBox);
 
 		// Add the wrapper panel to the display panel
@@ -277,18 +291,21 @@ public class ChatScreen extends JFrame implements ActionListener, KeyListener
 				String newMessage = splitMessage.getMessage();
 				String username = getUsername();
 
+				if (newMessage == null) {
+					JOptionPane.showMessageDialog(this, "Message cannot be blank.", "Message Not Found", JOptionPane.ERROR_MESSAGE);
+				}
+
 				// Create JSON message
-				String jsonMessage = createMessageJson(username, header, newMessage);
+				jsonMessage = createMessageJson(username, header, newMessage);
 
 				// Send the message to the server
 				sendToServer(jsonMessage);
-			} else {
-				System.out.println("Invalid input format.");
-			}
 
-			displayMessage(message);
-			sendText.setText("");
-			sendText.requestFocus();
+				sendText.setText("");
+				sendText.requestFocus();
+			} else {
+				JOptionPane.showMessageDialog(this, "Invalid format. Message cannot be blank.", "Message Not Found", JOptionPane.ERROR_MESSAGE);
+			}
 		} else if (source == leaveButton) {
 			leaveRequest();
 		}
@@ -300,7 +317,7 @@ public class ChatScreen extends JFrame implements ActionListener, KeyListener
 		}
 	}
 
-	public static SplitMessage splitMessage(String input) {
+	public SplitMessage splitMessage(String input) {
 		// Initialize variables to hold recipients and message
 		List<String> header = new ArrayList<>();
 		String message = "";
@@ -326,9 +343,15 @@ public class ChatScreen extends JFrame implements ActionListener, KeyListener
 			header.add("@all");
 			message = input.trim(); // Entire input is treated as the message
 		} else {
-			// Reconstruct the message part
-			int startIndex = input.indexOf(parts[header.size()]);
-			message = input.substring(startIndex).trim();
+			try{
+				// Reconstruct the message part
+				int startIndex = input.indexOf(parts[header.size()]);
+				message = input.substring(startIndex).trim();
+			}
+			catch (ArrayIndexOutOfBoundsException e){
+				JOptionPane.showMessageDialog(this, "Invalid format. Message cannot be blank.", "Message Not Found", JOptionPane.ERROR_MESSAGE);
+			}
+
 		}
 
 		// Convert the header list to a single string of recipients
