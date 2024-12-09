@@ -32,7 +32,6 @@ public class ReaderThread implements Runnable
 			fromServer = new BufferedReader(new InputStreamReader(server.getInputStream()));
 
 			while (true) {
-				System.out.println("Waiting for message from server...");
 				String message = fromServer.readLine();
 				if (message == null) {
 					System.out.println("Server connection closed.");
@@ -62,7 +61,7 @@ public class ReaderThread implements Runnable
 			JsonNode jsonNode = mapper.readTree(message);
 
 			// Extract relevant fields
-			String header = jsonNode.get("header").asText();
+			String header = jsonNode.get("header").asText().trim();
 			String clientMessage = jsonNode.get("message").asText();
 			String sender = jsonNode.get("sender").asText();
 			String timestamp = jsonNode.get("timestamp").asText();

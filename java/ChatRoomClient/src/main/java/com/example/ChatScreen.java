@@ -300,6 +300,7 @@ public class ChatScreen extends JFrame implements ActionListener, KeyListener
 
 				// Send the message to the server
 				sendToServer(jsonMessage);
+				System.out.println("What is being sent: " + jsonMessage);
 
 				sendText.setText("");
 				sendText.requestFocus();
