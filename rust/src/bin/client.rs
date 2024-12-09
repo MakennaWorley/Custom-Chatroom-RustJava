@@ -53,15 +53,17 @@ fn main() -> io::Result<()> {
 
                 if message.starts_with("SEND") {
                     println!("[CLIENT] Processing SEND message.");
-                    if let Some(json_message) = process_send_message(&message["SEND".len()..].trim()) {
-                        println!("[CLIENT] Sending JSON message: {}", json_message);
-                        if let Err(e) = stream.write_all(format!("SEND {}\n", json_message).as_bytes()) {
+                    let json_payload = &message["SEND".len()..].trim();
+
+                    if let Ok(parsed_json) = serde_json::from_str::<Value>(json_payload) {
+                        println!("[CLIENT] Sending JSON message: {}", json_payload);
+                        if let Err(e) = stream.write_all(format!("SEND {}\n", json_payload).as_bytes()) {
                             eprintln!("[CLIENT ERROR] Failed to send message: {}", e);
                             break;
                         }
                         println!("[CLIENT] Message successfully sent to server.");
 
-                        if let Ok(parsed_json) = serde_json::from_str::<Value>(&message) {
+                        if let Ok(parsed_json) = serde_json::from_str::<Value>(json_payload) {
                             if let Some(message_content) = parsed_json["message"].as_str() {
                                 println!("Message from you: {}", message_content);
                             } else {
@@ -147,6 +149,10 @@ fn main() -> io::Result<()> {
     Ok(())
 }
 
+fn is_valid_json(response: &str) -> bool {
+    serde_json::from_str::<Value>(response).is_ok()
+}
+
 fn process_server_response(response_trimmed: &str) {
     if response_trimmed.starts_with("200 BOARD") {
         let json_data = response_trimmed.strip_prefix("200 BOARD").unwrap_or("").trim();
@@ -160,20 +166,21 @@ fn process_server_response(response_trimmed: &str) {
         } else {
             println!("Unexpected format for userboard response.");
         }
-    } else if response_trimmed.starts_with("200 SEND") {
-        let json_part = response_trimmed.trim_start_matches("200 SEND").trim();
-        match serde_json::from_str::<serde_json::Value>(json_part) {
+    } else if is_valid_json(&response_trimmed) {
+        match serde_json::from_str::<serde_json::Value>(&response_trimmed) {
             Ok(json_response) => {
-                if let Some(sender) = json_response["sender"].as_str() {
-                    if let Some(message) = json_response["message"].as_str() {
+                if let Some(sender) = json_response.get("sender").and_then(|s| s.as_str()) {
+                    if let Some(message) = json_response.get("message").and_then(|m| m.as_str()) {
                         println!("Message from {}: {}", sender, message);
+                    } else {
+                        println!("Received a message without 'message' field: {}", json_response);
                     }
                 } else {
-                    println!("Unexpected JSON format: {}", json_response);
+                    println!("Received a JSON object without 'sender': {}", json_response);
                 }
             }
             Err(e) => {
-                println!("Failed to parse JSON: {}", json_part);
+                println!("Failed to parse JSON response: {}", response_trimmed);
                 println!("Error: {}", e);
             }
         }

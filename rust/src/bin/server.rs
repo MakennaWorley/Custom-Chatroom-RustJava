@@ -66,7 +66,7 @@ fn handle_client(mut stream: TcpStream, state: SharedState, streams: StreamMap) 
         let (command, message) = raw_message.split_once(' ').unwrap_or((raw_message.as_str(), ""));
         println!("[SERVER] Parsed command: {}, message: {}", command, message);
 
-        let response;
+        let mut response= "500 SERVER ERROR\n".to_string();
 
         match command {
             "JOIN" => {
@@ -85,57 +85,64 @@ fn handle_client(mut stream: TcpStream, state: SharedState, streams: StreamMap) 
             }
             "SEND" => {
                 if let Ok(parsed_message) = serde_json::from_str::<Value>(message) {
-                    if parsed_message["header"].as_str() == Some("@all") {
-                        broadcast_message(&streams, &parsed_message, Some(&peer_addr))?;
-                        response = "200 SENT\n".to_string();
-                    } else if let Some(header) = parsed_message["header"].as_str() {
-                        let mut all_sent = false;
-                        let recipients: Vec<&str> = header
-                            .split_whitespace()
-                            .filter(|word| word.starts_with('@'))
-                            .map(|user| user.trim_start_matches('@'))
-                            .collect();
+                    // Check if the content field exists and is valid
+                    if let Some(content) = parsed_message["message"].as_str() {
+                        let trimmed_content = content.trim();
+                        if !(1..=500).contains(&trimmed_content.len()) {
+                            eprintln!("[SERVER ERROR] Message content length invalid: {}", trimmed_content.len());
+                            response = "400 MESSAGE FAILED\n".to_string();
+                        } else if parsed_message["header"].as_str() == Some("@all") {
+                            broadcast_message(&streams, &parsed_message, Some(&peer_addr))?;
+                            response = "200 SENT\n".to_string();
+                        } else if let Some(header) = parsed_message["header"].as_str() {
+                            let mut all_sent = false;
+                            let recipients: Vec<&str> = header
+                                .split_whitespace()
+                                .filter(|word| word.starts_with('@'))
+                                .map(|user| user.trim_start_matches('@'))
+                                .collect();
 
-                        if !recipients.is_empty() {
-                            let state = state.read().unwrap();
-                            for recipient in recipients {
+                            if !recipients.is_empty() {
+                                let state = state.read().unwrap();
+                                for recipient in recipients {
+                                    println!("[SERVER] Finding {}", recipient);
 
-                                println!("[SERVER] Finding {}", recipient);
-
-                                if let Some((ip, _)) = state.iter().find(|(_, (name, _))| name == recipient) {
-                                    if let Some(user_stream) = streams.get(ip) {
-                                        if let Err(e) = send_to_user(&user_stream, &parsed_message) {
-                                            eprintln!("[SERVER ERROR] Failed to send message to {}: {}", recipient, e);
-                                            all_sent = false;
+                                    if let Some((ip, _)) = state.iter().find(|(_, (name, _))| name == recipient) {
+                                        if let Some(user_stream) = streams.get(ip) {
+                                            if let Err(e) = send_to_user(&user_stream, &parsed_message) {
+                                                eprintln!("[SERVER ERROR] Failed to send message to {}: {}", recipient, e);
+                                                all_sent = false;
+                                            } else {
+                                                println!("[SERVER] Message sent to {}", recipient);
+                                                all_sent = true;
+                                            }
                                         } else {
-                                            println!("[SERVER] Message sent to {}", recipient);
-                                            all_sent = true;
+                                            eprintln!("[SERVER] No active stream for recipient {}", recipient);
+                                            all_sent = false;
                                         }
                                     } else {
-                                        eprintln!("[SERVER] No active stream for recipient {}", recipient);
+                                        eprintln!("[SERVER ERROR] Recipient {} not found in state", recipient);
                                         all_sent = false;
                                     }
-                                } else {
-
-                                    eprintln!("[SERVER ERROR] Recipient {} not found in state", recipient);
-
-                                    all_sent = false;
                                 }
-                            }
-                            if all_sent {
-                                response = "200 SENT\n".to_string();
+                                if all_sent {
+                                    response = "200 SENT\n".to_string();
+                                } else {
+                                    response = "400 MESSAGE FAILED\n".to_string();
+                                }
                             } else {
                                 response = "400 MESSAGE FAILED\n".to_string();
                             }
                         } else {
-                            response = "400 INVALID HEADER\n".to_string();
+                            response = "400 MESSAGE FAILED\n".to_string();
                         }
                     } else {
-                        response = "400 INVALID HEADER\n".to_string();
+                        eprintln!("[SERVER ERROR] Missing or invalid content field in message from {}", peer_addr);
+                        response = "400 INVALID MESSAGE FORMAT\n".to_string();
                     }
                 } else {
                     eprintln!("[SERVER ERROR] Invalid JSON message from {}: {}", peer_addr, message);
-                    response = "400 INVALID MESSAGE\n".to_string();
+                    response = "400 INVALID MESSAGE FORMAT\n".to_string();
                 }
             }
             "USERBOARD" => {
@@ -226,11 +233,11 @@ fn broadcast_message(streams: &StreamMap, message: &Value, exclude_addr: Option<
     let message_string = serde_json::to_string(message)?;
     println!("[SERVER] Broadcasting {}", message_string);
     for entry in streams.iter() {
-        let (addr, mut stream) = entry.pair(); // Mark `stream` as mutable
+        let (addr, mut stream) = entry.pair();
         if Some(addr.as_str()) == exclude_addr {
             continue;
         }
-        if let Err(e) = stream.write_all(format!("200 SEND {}\n", message_string).as_bytes()) {
+        if let Err(e) = stream.write_all(format!("{}\n", message_string).as_bytes()) {
             eprintln!("[SERVER ERROR] Failed to send message to {}: {}", addr, e);
         }
     }
@@ -240,5 +247,5 @@ fn broadcast_message(streams: &StreamMap, message: &Value, exclude_addr: Option<
 fn send_to_user(mut stream: &TcpStream, json_message: &Value) -> std::io::Result<()> {
     let json_string = serde_json::to_string(json_message)?;
     println!("[SERVER] Sending private message {}", json_string);
-    stream.write_all(format!("200 SEND {}\n", json_string).as_bytes())
+    stream.write_all(format!("{}\n", json_string).as_bytes())
 }
