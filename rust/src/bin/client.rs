@@ -56,15 +56,20 @@ fn main() -> io::Result<()> {
                     println!("[CLIENT] Processing SEND message.");
                     let json_payload = &message["SEND".len()..].trim();
 
-                    if let Ok(parsed_json) = serde_json::from_str::<Value>(json_payload) {
-                        println!("[CLIENT] Sending JSON message: {}", json_payload);
-                        if let Err(e) = stream.write_all(format!("SEND {}\n", json_payload).as_bytes()) {
+                    if json_payload.len() < 1 || json_payload.len() > 500 {
+                        println!("[CLIENT ERROR] Message length must be between 1 and 500 characters.");
+                        continue;
+                    }
+
+                    if let Some(processed_json) = process_send_message(json_payload) {
+                        println!("[CLIENT] Sending JSON message: {}", processed_json);
+                        if let Err(e) = stream.write_all(format!("SEND {}\n", processed_json).as_bytes()) {
                             eprintln!("[CLIENT ERROR] Failed to send message: {}", e);
                             break;
                         }
                         println!("[CLIENT] Message successfully sent to server.");
 
-                        if let Ok(parsed_json) = serde_json::from_str::<Value>(json_payload) {
+                        if let Ok(parsed_json) = serde_json::from_str::<Value>(&processed_json) {
                             if let Some(message_content) = parsed_json["message"].as_str() {
                                 println!("Message from you: {}", message_content);
                             } else {
@@ -227,7 +232,8 @@ fn process_send_message(input: &str) -> Option<String> {
     match serde_json::from_str::<Value>(input) {
         Ok(mut json_obj) => {
             if let Some(obj) = json_obj.as_object_mut() {
-                obj.insert("timestamp".to_string(), Value::String(Utc::now().to_rfc3339()));
+                let timestamp = Utc::now().format("%H:%M").to_string();
+                obj.insert("timestamp".to_string(), Value::String(timestamp));
                 return Some(json_obj.to_string());
             } else {
                 println!("Invalid SEND command: JSON must be an object.");
