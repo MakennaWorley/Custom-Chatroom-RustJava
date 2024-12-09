@@ -9,6 +9,7 @@
  * When the user enters text in the textfield, it is displayed backwards 
  * in the display area.
  */
+package com.example;
 
 import javax.swing.*;
 import javax.swing.border.Border;
@@ -18,7 +19,11 @@ import java.io.BufferedWriter;
 import java.io.IOException;
 import java.io.OutputStreamWriter;
 import java.net.Socket;
-
+import com.fasterxml.jackson.databind.ObjectMapper;
+import java.util.ArrayList;
+import java.util.List;
+import java.time.LocalTime;
+import java.time.format.DateTimeFormatter;
 
 public class ChatScreen extends JFrame implements ActionListener, KeyListener
 {
@@ -35,7 +40,7 @@ public class ChatScreen extends JFrame implements ActionListener, KeyListener
 	private JPanel chatPanel;
 	private JButton sendButton;
 	private JTextField sendText;
-	private JTextArea displayArea;
+	private JPanel displayArea;
 	private JButton userBoardButton;
 	private JButton userStatusButton;
 	private JButton leaveButton;
@@ -174,9 +179,10 @@ public class ChatScreen extends JFrame implements ActionListener, KeyListener
 		/**
 		* set the title and size of the frame
 		*/
-		displayArea = new JTextArea(15, 40);
-		displayArea.setEditable(false);
-		displayArea.setFont(new Font("SansSerif", Font.PLAIN, 14));
+		displayArea = new JPanel();
+		displayArea.setLayout(new BoxLayout(displayArea, BoxLayout.Y_AXIS));
+
+		//displayArea.setBackground(Color.WHITE);
 
 		JScrollPane scrollPane = new JScrollPane(displayArea);
 		chatPanel.add(scrollPane, BorderLayout.CENTER);
@@ -197,7 +203,38 @@ public class ChatScreen extends JFrame implements ActionListener, KeyListener
 	 * Displays a message
 	 */
 	public void displayMessage(String message) {
-		displayArea.append(message + "\n");
+		// Create a JPanel to act as the message box
+		JPanel messageBox = new JPanel();
+		messageBox.setLayout(new GridBagLayout());
+		messageBox.setBackground(new Color(220, 220, 220)); // Light gray background
+		messageBox.setBorder(BorderFactory.createCompoundBorder(
+				BorderFactory.createLineBorder(Color.GRAY, 1), // Outer line border
+				BorderFactory.createEmptyBorder(2, 2, 2, 2) // Padding inside the panel
+		));
+		messageBox.setOpaque(true);
+
+		// Create a JLabel for the text
+		JLabel messageLabel = new JLabel(message);
+		messageLabel.setFont(new Font("SansSerif", Font.PLAIN, 14));
+		messageLabel.setHorizontalAlignment(SwingConstants.CENTER);
+
+		// Add the JLabel to the message box
+		messageBox.add(messageLabel);
+
+		messageBox.setPreferredSize(new Dimension(messageLabel.getPreferredSize().width + 10, messageLabel.getPreferredSize().height + 10));
+
+		// Wrap the messageBox in a JPanel to use FlowLayout
+		JPanel wrapperPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 0, 0));
+		wrapperPanel.setBackground(Color.WHITE); // Match the background of the display area
+		wrapperPanel.add(messageBox);
+
+		// Add the wrapper panel to the display panel
+		displayArea.add(wrapperPanel);
+		displayArea.add(Box.createVerticalStrut(5));
+
+		// Repaint and revalidate to update the display
+		displayArea.revalidate();
+		displayArea.repaint();
 	}
 
 
@@ -226,6 +263,24 @@ public class ChatScreen extends JFrame implements ActionListener, KeyListener
 			}
 		} else if (source == sendButton) {
 			String message = sendText.getText().trim();
+			//send this to server
+			// Split the input into recipients and message
+			SplitMessage splitMessage = splitMessage(message);
+
+			if (splitMessage != null) {
+				String header = splitMessage.getHeader();
+				String newMessage = splitMessage.getMessage();
+				String username = getUsername();
+
+				// Create JSON message
+				String jsonMessage = createMessageJson(username, header, newMessage);
+
+				// Send the message to the server
+				sendToServer(jsonMessage);
+			} else {
+				System.out.println("Invalid input format.");
+			}
+
 			displayMessage(message);
 			sendText.setText("");
 			sendText.requestFocus();
@@ -233,13 +288,136 @@ public class ChatScreen extends JFrame implements ActionListener, KeyListener
 			leaveRequest();
 		}
 		else if(source == userBoardButton) {
-
+			getUserBoard();
 		}
 		else if (source == userStatusButton) {
 
 		}
 	}
 
+	public static SplitMessage splitMessage(String input) {
+		// Initialize variables to hold recipients and message
+		List<String> header = new ArrayList<>();
+		String message = "";
+
+		// Split the string by spaces
+		String[] parts = input.trim().split("\\s+"); // Trim input and split by whitespace
+
+		boolean hasAtSymbol = false;
+
+		for (String part : parts) {
+			if (part.startsWith("@")) {
+				// Add all words starting with '@' to the recipients list
+				header.add(part);
+				hasAtSymbol = true;
+			} else {
+				// The rest is considered the message
+				break;
+			}
+		}
+
+		// If no @recipients were found, default to "@all"
+		if (!hasAtSymbol) {
+			header.add("@all");
+			message = input.trim(); // Entire input is treated as the message
+		} else {
+			// Reconstruct the message part
+			int startIndex = input.indexOf(parts[header.size()]);
+			message = input.substring(startIndex).trim();
+		}
+
+		// Convert the header list to a single string of recipients
+		String headerString = String.join(" ", header); // Joins the recipients with a space
+
+		if (message.isEmpty()) {
+			return null; // Return null if message is empty
+		}
+
+		return new SplitMessage(headerString, message);
+	}
+
+	// Helper class to hold the recipients and message together
+	static class SplitMessage {
+		private String header;
+		private String message;
+
+		public SplitMessage(String header, String message) {
+			this.header = header;
+			this.message = message;
+		}
+
+		public String getHeader() {
+			return header;
+		}
+
+		public String getMessage() {
+			return message;
+		}
+	}
+
+	public static String createMessageJson(String sender, String header, String message) {
+		// Create an object to hold the message details
+		String timestamp = LocalTime.now().format(DateTimeFormatter.ofPattern("HH:mm"));
+		Message messageObj = new Message(sender, header, timestamp, message);
+
+		// Use Jackson to convert the object to a JSON string
+		ObjectMapper objectMapper = new ObjectMapper();
+		try {
+			return objectMapper.writeValueAsString(messageObj);
+		} catch (Exception e) {
+			e.printStackTrace();
+			return null;
+		}
+	}
+
+	// Message class to hold the message details
+	static class Message {
+
+		private String sender;
+		private String header;
+		private String message;
+		private String timestamp;
+
+		public Message(String sender, String header, String timestamp, String message) {
+			this.sender = sender;
+			this.header = header;
+			this.message = message;
+			this.timestamp = timestamp;
+		}
+
+		// Getters and Setters (optional, for Jackson)
+		public String getSender() {
+			return sender;
+		}
+
+		public void setSender(String sender) {
+			this.sender = sender;
+		}
+
+		public String getHeader() {
+			return header;
+		}
+
+		public void setHeader(String header) {
+			this.header = header;
+		}
+
+		public String getMessage() {
+			return message;
+		}
+
+		public void setMessage(String message) {
+			this.message = message;
+		}
+
+		public String getTimestamp() {
+			return timestamp;
+		}
+
+		public void setTimestamp(String timestamp) {
+			this.timestamp = timestamp;
+		}
+	}
 
 	private boolean validateUsername(String username) {
 		if (username.length() < 3 || username.length() > 30) {
@@ -307,6 +485,16 @@ public class ChatScreen extends JFrame implements ActionListener, KeyListener
         }
     }
 
+	private void sendToServer(String jsonMessage) {
+		try {
+			toServer.write("SEND " + jsonMessage + "\n");
+			toServer.flush();
+		} catch (IOException e) {
+			e.printStackTrace();
+			JOptionPane.showMessageDialog(this, "Failed to send a message.", "Error", JOptionPane.ERROR_MESSAGE);
+		}
+	}
+
 	private void getUserBoard() {
 		try {
 			toServer.write("USERBOARD\n");
@@ -320,7 +508,7 @@ public class ChatScreen extends JFrame implements ActionListener, KeyListener
 	}
 
 	private void getUserStatus() {
-
+		//not implementing it currently
 	}
 
 	/**
@@ -332,9 +520,10 @@ public class ChatScreen extends JFrame implements ActionListener, KeyListener
 	 * This is invoked when the user presses
 	 * the ENTER key.
 	 */
-	public void keyPressed(KeyEvent e) { 
-		if (e.getKeyCode() == KeyEvent.VK_ENTER)
-			joinButton.addActionListener(this);
+	public void keyPressed(KeyEvent e) {
+		if (e.getKeyCode() == KeyEvent.VK_ENTER) {
+			sendButton.doClick();
+		}
 	}
 
 	/** Not implemented */
@@ -342,7 +531,6 @@ public class ChatScreen extends JFrame implements ActionListener, KeyListener
 
 	/** Not implemented */
 	public void keyTyped(KeyEvent e) {  }
-
 
 	public static void main(String[] args) {
 		if (args.length != 1) {
