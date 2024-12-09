@@ -13,14 +13,11 @@ Pull down the lastest changes from the main branch.
 
 Then cd into the rust directory from this repo, run ```cargo build``` and then run from that same location ```cargo run --bin server```.
 
+
 To run the client:
 
-Make sure you have Java installed on your device ()
+Make sure you have Java installed on your device (https://www.java.com/en/download/) and maven (https://maven.apache.org/download.cgi)
 
-cd into ...
+cd into java and run ```mvn clean install```
 
 java ChatScreen <hostname>
-
-Make sure maven installed too and run mvn clean install
-
-Reload all maven dependencies if getting error
