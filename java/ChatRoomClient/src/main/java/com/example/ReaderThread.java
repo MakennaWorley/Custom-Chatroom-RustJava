@@ -39,6 +39,9 @@ public class ReaderThread implements Runnable
 					System.out.println("Server connection closed.");
 					break;
 				}
+
+				System.out.println(message);
+
 				// Handle raw JSON messages
 				if (isJSONValid(message)) {
 					try {
@@ -75,13 +78,12 @@ public class ReaderThread implements Runnable
 						case "200":
 							if (payload.startsWith("OK")) {
 								String username = screen.getUsername();
-								screen.displayMessage("Joined chatroom as " + username);
+								screen.displayMessage("Welcome to the chatroom " + username + "!\n");
 							} else if (payload.startsWith("BYE")) {
 								JOptionPane.showMessageDialog(null, "Disconnected from the server.", "Disconnected", JOptionPane.INFORMATION_MESSAGE);
 								System.out.println("Server requested disconnection.");
 								System.exit(0); // Close the application
 							} else if (payload.startsWith("BOARD")) {
-								System.out.println(message);
 								// Extract JSON from payload (after "BOARD ")
 								String json = payload.substring(6).trim();
 
@@ -112,12 +114,6 @@ public class ReaderThread implements Runnable
 							break;
 					}
 				}
-
-		// 		//displayMessage("Joined chat as " + username);
-
-		// 		//so continually be reading from the server and do statments
-		// 		//if message is 200 OK -> display "joinned chatroom!"
-		// 		//if message is SEND JSON file -> display "message from:_ and message:_"
 			}
 		}
 		catch (IOException ioe) { 
@@ -130,9 +126,14 @@ public class ReaderThread implements Runnable
 
 	private boolean isJSONValid(String message) {
 		try {
-			final ObjectMapper mapper = new ObjectMapper();
-			mapper.readTree(message); // Try to parse as JSON
-			return true;
+			ObjectMapper mapper = new ObjectMapper();
+			JsonNode jsonNode = mapper.readTree(message); // Attempt to parse as JSON
+
+			// Check for specific keys to validate the structure
+			return jsonNode.has("header") &&
+					jsonNode.has("message") &&
+					jsonNode.has("sender") &&
+					jsonNode.has("timestamp");
 		} catch (IOException e) {
 			return false; // Not valid JSON
 		}
