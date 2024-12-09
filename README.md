@@ -3,7 +3,7 @@ Homework 4/Final for CMPT 352 Networks
 
 This chat room mainly uses a Java client for the interface to the Rust server which follows the protocol listed as a pdf on this repo which was designed by Jesse Melanson, Makenna Worley, Scott Ruiz Gomez, and Shreeya Maskey.
 
-Makenna created both the Rust server and a barebones Rust client and Shreeya built the Java client. The Rust client requires you to write ```JOIN Makenna``` and ```SEND {"header": "@all", "sender": "Makenna", "message": "Hi"}```. Therefore not recommended for most users just wanting to use this as a chatroom.
+Makenna created both the Rust server and a barebones Rust client, and Shreeya built the Java client. The Rust client requires you to write ```JOIN Makenna``` and ```SEND {"header": "@all", "sender": "Makenna", "message": "Hi"}```. Therefore not recommended for most users just wanting to use this as a chatroom.
 
 To run the server:
 
@@ -16,8 +16,11 @@ Then cd into the rust directory from this repo, run ```cargo build``` and then r
 
 To run the client:
 
-Make sure you have Java installed on your device (https://www.java.com/en/download/) and maven (https://maven.apache.org/download.cgi)
+Make sure you have Java installed on your device (https://www.java.com/en/download/) and maven (https://maven.apache.org/download.cgi).
 
-cd into java and run ```mvn clean install```
-
-java ChatScreen <hostname>
+Make sure the maven dependencies are downloaded/up to date:
+	cd into java/ChatRoomClient and run ```mvn clean install```
+Then
+	```mvn compile```
+To execute
+	```mvn exec:java -Dexec.mainClass="com.example.ChatScreen" -Dexec.args="hostname"```
