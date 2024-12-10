@@ -19,6 +19,7 @@ To run the client:
 Make sure you have Java installed on your device (https://www.java.com/en/download/) and maven (https://maven.apache.org/download.cgi).
 
 Make sure the maven dependencies are downloaded/up to date:
+
 cd into java/ChatRoomClient and run
 
  	mvn clean install
