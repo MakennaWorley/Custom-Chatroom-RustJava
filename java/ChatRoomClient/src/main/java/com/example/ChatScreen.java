@@ -449,6 +449,7 @@ public class ChatScreen extends JFrame implements ActionListener, KeyListener
 	}
 
 	private boolean validateUsername(String username) {
+		System.out.println("validateUsername");
 		if (username.length() < 3 || username.length() > 30) {
 			JOptionPane.showMessageDialog(this, "Username must be between 3 and 30 characters.", "Invalid Username", JOptionPane.ERROR_MESSAGE);
 			return false;
@@ -463,7 +464,7 @@ public class ChatScreen extends JFrame implements ActionListener, KeyListener
 			JOptionPane.showMessageDialog(this, "Username cannot be 'all'.", "Invalid Username", JOptionPane.ERROR_MESSAGE);
 			return false;
 		}
-
+		System.out.println("validateUsername is true");
 		return true;
 	}
 
