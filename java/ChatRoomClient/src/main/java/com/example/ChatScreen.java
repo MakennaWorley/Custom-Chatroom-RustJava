@@ -278,7 +278,6 @@ public class ChatScreen extends JFrame implements ActionListener, KeyListener
 
 				// Send the message to the server
 				sendToServer(jsonMessage);
-				System.out.println("What is being sent: " + jsonMessage);
 
 				sendText.setText("");
 				sendText.requestFocus();
@@ -430,7 +429,6 @@ public class ChatScreen extends JFrame implements ActionListener, KeyListener
 
 	// Validate username according to the protocol
 	private boolean validateUsername(String username) {
-		System.out.println("validateUsername");
 		if (username.length() < 3 || username.length() > 30) {
 			JOptionPane.showMessageDialog(this, "Username must be between 3 and 30 characters.", "Invalid Username", JOptionPane.ERROR_MESSAGE);
 			return false;
@@ -445,7 +443,6 @@ public class ChatScreen extends JFrame implements ActionListener, KeyListener
 			JOptionPane.showMessageDialog(this, "Username cannot be 'all'.", "Invalid Username", JOptionPane.ERROR_MESSAGE);
 			return false;
 		}
-		System.out.println("validateUsername is true");
 		return true;
 	}
 
