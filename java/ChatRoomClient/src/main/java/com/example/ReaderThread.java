@@ -1,6 +1,7 @@
 /**
  * This thread is passed a socket that it reads from. Whenever it gets input
- * it writes it to the ChatScreen text area using the displayMessage() method.
+ * it applies the layed out protocol and
+ * writes it to the ChatScreen text area using the displayMessage() method.
  */
 package com.example;
 

@@ -1,13 +1,8 @@
 /**
- * This program is a rudimentary demonstration of Swing GUI programming.
- * Note, the default layout manager for JFrames is the border layout. This
- * enables us to position containers using the coordinates South and Center.
+ * This program is the client with Swing GUI that utilizes the protocol
+ * outlined by Jesse, Makenna, Scott and Shreeya in CMPT 352
  *
- * Usage:
- *	java ChatScreen
- *
- * When the user enters text in the textfield, it is displayed backwards 
- * in the display area.
+ * Usage has been described in the README.md file of the GitHub repository
  */
 package com.example;
 
@@ -46,7 +41,6 @@ public class ChatScreen extends JFrame implements ActionListener, KeyListener
 	private JButton userStatusButton;
 	private JButton leaveButton;
 
-
 	//Declaring socket components
 	private Socket socket = null;
     private BufferedWriter toServer;
@@ -56,6 +50,7 @@ public class ChatScreen extends JFrame implements ActionListener, KeyListener
 	public static final int PORT = 8000;
 	public String jsonMessage;
 
+	//Colors for GUI styling
 	Color purple = new Color(151,153,186);
 	Color lightpink = new Color(249,225,224);
 	Color lightpurple = new Color(188,133,163);
@@ -66,7 +61,7 @@ public class ChatScreen extends JFrame implements ActionListener, KeyListener
 		/**
 		 * a panel used for placing components
 		 */
-		// Set up CardLayout
+		// Set up CardLayout so that the panel view can switch later
 		cardLayout = new CardLayout();
 		mainPanel = new JPanel(cardLayout);
 
@@ -89,12 +84,13 @@ public class ChatScreen extends JFrame implements ActionListener, KeyListener
 		setVisible(true);
 	}
 
-
+	// Creates a log in panel view
 	private void createLoginPanel() {
 
 		loginPanel = new JPanel(new GridBagLayout());
 		loginPanel.setBackground(purple);
 
+		// Utilizing grids to style the login screen
 		GridBagConstraints gbc = new GridBagConstraints();
 		gbc.insets = new Insets(5, 5, 5, 5);
 
@@ -119,7 +115,7 @@ public class ChatScreen extends JFrame implements ActionListener, KeyListener
 		loginPanel.add(joinButton, gbc);
 	}
 
-
+	// Creates a display chat panel view
 	private void createChatPanel() {
 		chatPanel = new JPanel(new BorderLayout());
 		chatPanel.setPreferredSize(new Dimension(800, 600)); // Set the preferred size
@@ -131,19 +127,16 @@ public class ChatScreen extends JFrame implements ActionListener, KeyListener
 		leaveButton = new JButton("Leave");
 		northPanel.setBackground(lightpurple);
 
-
+		// Create the south panel for message text field
 		JPanel southPanel = new JPanel();
 		Border etched = BorderFactory.createEtchedBorder();
 		Border titled = BorderFactory.createTitledBorder(etched, "Enter Message Here ...");
 		southPanel.setBorder(titled);
 
-		/**
-		* set up all the components
-		*/
 		sendText = new JTextField(30);
 		sendButton = new JButton("Send");
 
-		// Limit to 500 characters
+		// In order to limit messages to 500 characters
 		((AbstractDocument) sendText.getDocument()).setDocumentFilter(new LengthFilter(500));
 
 		/**
@@ -155,6 +148,7 @@ public class ChatScreen extends JFrame implements ActionListener, KeyListener
 		userStatusButton.addActionListener(this);
 		leaveButton.addActionListener(this);
 
+		// Styling with background colors
 		userBoardButton.setBackground(lightpink);
 		userBoardButton.setOpaque(true);
 		userBoardButton.setBorderPainted(false);
@@ -165,8 +159,6 @@ public class ChatScreen extends JFrame implements ActionListener, KeyListener
 		leaveButton.setOpaque(true);
 		leaveButton.setBorderPainted(false);
 		leaveButton.setForeground(Color.WHITE);
-
-
 		sendButton.setBackground(lightpurple);
 		sendButton.setOpaque(true);
 		sendButton.setBorderPainted(false);
@@ -180,20 +172,15 @@ public class ChatScreen extends JFrame implements ActionListener, KeyListener
 		northPanel.add(userStatusButton);
 		northPanel.add(leaveButton);
 
-		/**
-		* set the title and size of the frame
-		*/
+		// Panel for displaying the texts
 		displayArea = new JPanel();
 		displayArea.setLayout(new BoxLayout(displayArea, BoxLayout.Y_AXIS));
-
-		//displayArea.setBackground(Color.WHITE);
 
 		JScrollPane scrollPane = new JScrollPane(displayArea);
 		chatPanel.add(scrollPane, BorderLayout.CENTER);
 		// Add panels to the chatPanel
 		chatPanel.add(northPanel, BorderLayout.NORTH);
 		chatPanel.add(southPanel, BorderLayout.SOUTH);
-
 
 		/** anonymous inner class to handle window closing events */
 		addWindowListener(new WindowAdapter() {
@@ -203,9 +190,7 @@ public class ChatScreen extends JFrame implements ActionListener, KeyListener
 		});
 	}
 
-	/**
-	 * Displays a message
-	 */
+	// Displays a message
 	public void displayMessage(String message) {
 		// Create a JPanel to act as the message box
 		JPanel messageBox = new JPanel();
@@ -214,7 +199,6 @@ public class ChatScreen extends JFrame implements ActionListener, KeyListener
 		String username = getUsername();
 		// Extract the sender's name from the message
 		String senderName = message.contains(" ") ? message.split(" ")[0].trim() : "";
-		System.out.println("senderName " + senderName);
 		// Check if the sender's name matches the username
 		boolean isOwnMessage = senderName.equals(username);
 
@@ -226,7 +210,7 @@ public class ChatScreen extends JFrame implements ActionListener, KeyListener
 		}
 		messageBox.setBorder(BorderFactory.createCompoundBorder(
 				BorderFactory.createLineBorder(Color.GRAY, 1), // Outer line border
-				BorderFactory.createEmptyBorder(2, 2, 2, 2) // Padding inside the panel
+				BorderFactory.createEmptyBorder(2, 2, 2, 2) // Provides padding inside the panel
 		));
 
 		// Create a JLabel for the text
@@ -236,18 +220,14 @@ public class ChatScreen extends JFrame implements ActionListener, KeyListener
 
 		// Add the JLabel to the message box
 		messageBox.add(messageLabel);
-
 		messageBox.setPreferredSize(new Dimension(messageLabel.getPreferredSize().width + 15, messageLabel.getPreferredSize().height + 15));
 
 		// Wrap the messageBox in a JPanel to use FlowLayout
 		JPanel wrapperPanel = new JPanel(new FlowLayout(isOwnMessage ? FlowLayout.RIGHT : FlowLayout.LEFT, 0, 0));
 		wrapperPanel.setBackground(Color.WHITE); // Match the background of the display area
-
-		//if the message starts with the username, flowlayout.right and change color to lightpurple
-
 		wrapperPanel.add(messageBox);
 
-		// Add the wrapper panel to the display panel
+		// Add the wrapper panel to the displayArea panel
 		displayArea.add(wrapperPanel);
 		displayArea.add(Box.createVerticalStrut(5));
 
@@ -255,7 +235,6 @@ public class ChatScreen extends JFrame implements ActionListener, KeyListener
 		displayArea.revalidate();
 		displayArea.repaint();
 	}
-
 
 	/**
 	 * This method responds to action events .... i.e. button clicks
@@ -282,7 +261,6 @@ public class ChatScreen extends JFrame implements ActionListener, KeyListener
 			}
 		} else if (source == sendButton) {
 			String message = sendText.getText().trim();
-			//send this to server
 			// Split the input into recipients and message
 			SplitMessage splitMessage = splitMessage(message);
 
@@ -314,10 +292,11 @@ public class ChatScreen extends JFrame implements ActionListener, KeyListener
 			getUserBoard();
 		}
 		else if (source == userStatusButton) {
-
+			//may be implemented later
 		}
 	}
 
+	// Splits the message input into 2 parts
 	public SplitMessage splitMessage(String input) {
 		// Initialize variables to hold recipients and message
 		List<String> header = new ArrayList<>();
@@ -384,6 +363,7 @@ public class ChatScreen extends JFrame implements ActionListener, KeyListener
 		}
 	}
 
+	// Creates the JSON message to be sent to server
 	public static String createMessageJson(String sender, String header, String message) {
 		// Create an object to hold the message details
 		String timestamp = LocalTime.now().format(DateTimeFormatter.ofPattern("HH:mm"));
@@ -448,6 +428,7 @@ public class ChatScreen extends JFrame implements ActionListener, KeyListener
 		}
 	}
 
+	// Validate username according to the protocol
 	private boolean validateUsername(String username) {
 		System.out.println("validateUsername");
 		if (username.length() < 3 || username.length() > 30) {
@@ -468,6 +449,7 @@ public class ChatScreen extends JFrame implements ActionListener, KeyListener
 		return true;
 	}
 
+	// Getter method for accessing username
 	public String getUsername() {
 		return username;
 	}
@@ -493,6 +475,7 @@ public class ChatScreen extends JFrame implements ActionListener, KeyListener
         }
 	}
 
+	// Sends the JOIN Username request to the server
 	private void sendJoinRequest(String username) {
         try {
             toServer.write("JOIN " + username + "\n");
@@ -505,6 +488,7 @@ public class ChatScreen extends JFrame implements ActionListener, KeyListener
         }
     }
 
+	// Sends a LEAVE request upon a button click to the server
 	private void leaveRequest() {
         try {
             toServer.write("LEAVE\n");
@@ -515,6 +499,7 @@ public class ChatScreen extends JFrame implements ActionListener, KeyListener
         }
     }
 
+	// Sends a SEND request upon a button click to the server
 	private void sendToServer(String jsonMessage) {
 		try {
 			toServer.write("SEND " + jsonMessage + "\n");
@@ -525,6 +510,7 @@ public class ChatScreen extends JFrame implements ActionListener, KeyListener
 		}
 	}
 
+	// Requests the USERBOARD from the server
 	private void getUserBoard() {
 		try {
 			toServer.write("USERBOARD\n");
@@ -537,6 +523,7 @@ public class ChatScreen extends JFrame implements ActionListener, KeyListener
 		}
 	}
 
+	// Would get the user status and let the user set their status
 	private void getUserStatus() {
 		//not implementing it currently
 	}
