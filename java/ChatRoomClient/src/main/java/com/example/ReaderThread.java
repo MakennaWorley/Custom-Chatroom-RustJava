@@ -1,6 +1,6 @@
 /**
  * This thread is passed a socket that it reads from. Whenever it gets input
- * it applies the layed out protocol and
+ * it applies the laid out protocol and
  * writes it to the ChatScreen text area using the displayMessage() method.
  */
 package com.example;
@@ -18,6 +18,8 @@ import com.fasterxml.jackson.databind.JsonNode;
 
 public class ReaderThread implements Runnable
 {
+
+	// Creating instances for server connection
 	Socket server;
 	BufferedReader fromServer;
 	ChatScreen screen;
@@ -39,8 +41,6 @@ public class ReaderThread implements Runnable
 					break;
 				}
 
-				System.out.println("Message received: " + message);
-
 				// Handle JSON or plain commands
 				if (isJSONValid(message)) {
 					processJsonMessage(message);
@@ -55,6 +55,7 @@ public class ReaderThread implements Runnable
 		}
 	}
 
+	// If received a JSON object, parses it for SEND protocol
 	private void processJsonMessage(String message) {
 		try {
 			// Parse the JSON object
@@ -79,6 +80,7 @@ public class ReaderThread implements Runnable
 		}
 	}
 
+	// If received any other protocol commands, parses that
 	private void processCommand(String message) {
 			// now display it on the display area
 			// Parse the message
@@ -139,6 +141,7 @@ public class ReaderThread implements Runnable
 	}
 
 
+	// Checks if the JSON object received is in valid format
 	private boolean isJSONValid(String message) {
 		try {
 			ObjectMapper mapper = new ObjectMapper();
